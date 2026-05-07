@@ -1,0 +1,241 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;600;700;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Rajdhani', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #0a0a0f;
+  color: #e2e0f0;
+}
+
+/* Neon glow utilities */
+.glow-purple {
+  box-shadow: 0 0 8px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.2);
+}
+.glow-cyan {
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.5), 0 0 20px rgba(34, 211, 238, 0.2);
+}
+.glow-red {
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6), 0 0 20px rgba(239, 68, 68, 0.2);
+}
+.text-glow-purple {
+  text-shadow: 0 0 10px rgba(168, 85, 247, 0.8);
+}
+.text-glow-cyan {
+  text-shadow: 0 0 10px rgba(34, 211, 238, 0.8);
+}
+
+/* Scanline overlay on header */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+  pointer-events: none;
+}
+
+/* Grid background */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(168, 85, 247, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(168, 85, 247, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Orbitron font for headings */
+.font-orbitron {
+  font-family: 'Orbitron', monospace;
+}
+.font-mono-game {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Gamer form controls */
+.game-input {
+  width: 100%;
+  background: #07070f;
+  border: 1px solid rgba(109, 40, 217, 0.4);
+  color: #e2e0f0;
+  padding: 0.5rem 0.75rem;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.game-input:focus {
+  border-color: rgba(139, 92, 246, 0.7);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
+}
+.game-input::placeholder { color: #3d3a52; }
+.game-input option { background: #0f0f1e; color: #e2e0f0; }
+
+.game-btn-primary {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  background: rgba(124, 58, 237, 0.2);
+  border: 1px solid rgba(139, 92, 246, 0.6);
+  color: #c4b5fd;
+  font-family: 'Orbitron', monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.game-btn-primary:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.4);
+  color: white;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+}
+.game-btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.game-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #6b5fa8;
+  margin-bottom: 0.375rem;
+  font-family: 'Orbitron', monospace;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0f0f1a; }
+::-webkit-scrollbar-thumb { background: #4c1d95; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
+
+/* Input / select dark styling */
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+  color-scheme: dark;
+}
+
+/* ─── react-datepicker gamer theme ─────────────────────────────────────────── */
+.gc-popper { z-index: 9999; }
+
+.gc-calendar {
+  background: #0f0f1e !important;
+  border: 1px solid rgba(109, 40, 217, 0.5) !important;
+  border-radius: 0 !important;
+  font-family: 'Rajdhani', sans-serif !important;
+  box-shadow: 0 0 20px rgba(109, 40, 217, 0.2) !important;
+  padding: 8px !important;
+}
+
+/* Header (month/year nav) */
+.gc-calendar .react-datepicker__header {
+  background: #0a0a12 !important;
+  border-bottom: 1px solid rgba(109, 40, 217, 0.3) !important;
+  border-radius: 0 !important;
+  padding: 10px 0 8px !important;
+}
+.gc-calendar .react-datepicker__current-month,
+.gc-calendar .react-datepicker-time__header {
+  color: #c4b5fd !important;
+  font-family: 'Orbitron', monospace !important;
+  font-size: 0.7rem !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+}
+.gc-calendar .react-datepicker__navigation-icon::before {
+  border-color: #7c3aed !important;
+}
+.gc-calendar .react-datepicker__navigation:hover .react-datepicker__navigation-icon::before {
+  border-color: #c4b5fd !important;
+}
+
+/* Day names */
+.gc-calendar .react-datepicker__day-name {
+  color: #6b5fa8 !important;
+  font-family: 'Orbitron', monospace !important;
+  font-size: 0.6rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  width: 2rem !important;
+  line-height: 2rem !important;
+}
+
+/* Day cells */
+.gc-calendar .react-datepicker__day {
+  color: #c4b5fd !important;
+  border-radius: 0 !important;
+  width: 2rem !important;
+  line-height: 2rem !important;
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+  transition: background 0.1s, color 0.1s !important;
+}
+.gc-calendar .react-datepicker__day:hover {
+  background: rgba(124, 58, 237, 0.3) !important;
+  color: white !important;
+}
+.gc-calendar .react-datepicker__day--selected,
+.gc-calendar .react-datepicker__day--keyboard-selected {
+  background: rgba(124, 58, 237, 0.7) !important;
+  color: white !important;
+  font-weight: 700 !important;
+}
+.gc-calendar .react-datepicker__day--today {
+  border: 1px solid rgba(139, 92, 246, 0.5) !important;
+  color: #a78bfa !important;
+  font-weight: 700 !important;
+}
+.gc-calendar .react-datepicker__day--disabled {
+  color: #2d2a3e !important;
+  cursor: not-allowed !important;
+}
+.gc-calendar .react-datepicker__day--outside-month {
+  color: #3d3a52 !important;
+}
+
+/* Time list */
+.gc-calendar .react-datepicker__time-container {
+  border-left: 1px solid rgba(109, 40, 217, 0.3) !important;
+}
+.gc-calendar .react-datepicker__time {
+  background: #0a0a12 !important;
+}
+.gc-calendar .react-datepicker__time-list-item {
+  color: #c4b5fd !important;
+  font-size: 0.85rem !important;
+  height: 32px !important;
+  line-height: 32px !important;
+  padding: 0 10px !important;
+  transition: background 0.1s !important;
+}
+.gc-calendar .react-datepicker__time-list-item:hover {
+  background: rgba(124, 58, 237, 0.3) !important;
+  color: white !important;
+}
+.gc-calendar .react-datepicker__time-list-item--selected {
+  background: rgba(124, 58, 237, 0.7) !important;
+  color: white !important;
+  font-weight: 700 !important;
+}
+.gc-calendar .react-datepicker__time-list-item--disabled {
+  color: #2d2a3e !important;
+}
+
+/* Triangle arrow */
+.gc-popper .react-datepicker__triangle::before,
+.gc-popper .react-datepicker__triangle::after {
+  border-bottom-color: rgba(109, 40, 217, 0.5) !important;
+}
