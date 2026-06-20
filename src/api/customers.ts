@@ -20,6 +20,11 @@ export async function createCustomer(payload: { name: string; phone: string }): 
   return res.data.data;
 }
 
+export async function updateCustomer(id: number, payload: { name: string; phone: string }): Promise<Customer> {
+  const res = await client.put(`/customers/${id}`, payload);
+  return res.data.data;
+}
+
 export async function getCustomerSessions(id: number, params?: {
   page?: number;
   limit?: number;

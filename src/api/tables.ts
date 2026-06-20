@@ -21,6 +21,8 @@ export async function createTable(payload: {
   type: string;
   price_per_minute?: number;
   price_per_hour?: number;
+  wiz_ip?: string;
+  wiz_mac?: string;
 }): Promise<GamingTable> {
   const res = await client.post('/tables', payload);
   return res.data.data;

@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Session, ActiveTableSession, GamingTable as GT } from '../../types';
-import { getSessions, type SessionFilters } from '../../api/sessions';
+import { getSessions, updateSessionPayment, type SessionFilters } from '../../api/sessions';
 import { getTables } from '../../api/tables';
 import { Badge } from '../../components/Badge';
 import { Spinner } from '../../components/Spinner';
 import { ErrorMessage } from '../../components/ErrorMessage';
 import { DatePicker } from '../../components/DatePicker';
+import { Modal } from '../../components/Modal';
 import { EndSessionModal } from '../Dashboard/EndSessionModal';
+import { useAuth } from '../../hooks/useAuth';
 
 const PAGE_LIMIT = 20;
 
@@ -69,8 +71,11 @@ function sessionToTable(s: Session, tables: GT[]): GT {
   };
 }
 
+type PaymentMode = 'cash' | 'online' | 'split';
+
 export function Sessions() {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [total, setTotal] = useState(0);
@@ -84,6 +89,14 @@ export function Sessions() {
 
   // End session modal state
   const [endModalSession, setEndModalSession] = useState<Session | null>(null);
+
+  // Edit payment modal state
+  const [paymentTarget, setPaymentTarget] = useState<Session | null>(null);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
+  const [cashAmt, setCashAmt] = useState('');
+  const [onlineAmt, setOnlineAmt] = useState('');
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
 
   const [statusFilter, setStatusFilter] = useState<'' | 'active' | 'paused' | 'reserved' | 'closed'>('');
   const [tableFilter, setTableFilter] = useState<number | ''>('');
@@ -139,6 +152,57 @@ export function Sessions() {
   const hasFilters = statusFilter !== '' || tableFilter !== '' || dateFilter !== '';
 
   const isLive = (s: Session) => s.status === 'active' || s.status === 'paused';
+
+  function openPaymentEdit(s: Session) {
+    const cash = parseFloat(s.net_amount ?? '0');
+    const pm = s.payment_method;
+    const mode: PaymentMode = pm === 'online' ? 'online' : pm === 'split' ? 'split' : 'cash';
+    setPaymentTarget(s);
+    setPaymentMode(mode);
+    if (mode === 'cash') { setCashAmt(s.net_amount ?? ''); setOnlineAmt('0'); }
+    else if (mode === 'online') { setCashAmt('0'); setOnlineAmt(s.net_amount ?? ''); }
+    else { setCashAmt(''); setOnlineAmt(''); }
+    setPaymentError('');
+  }
+
+  function closePaymentEdit() {
+    setPaymentTarget(null);
+    setCashAmt('');
+    setOnlineAmt('');
+    setPaymentError('');
+  }
+
+  async function handlePaymentSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!paymentTarget) return;
+    setPaymentError(''); setPaymentSubmitting(true);
+    try {
+      const netAmount = parseFloat(paymentTarget.net_amount ?? '0');
+      let cash = 0, online = 0;
+      if (paymentMode === 'cash') {
+        cash = netAmount; online = 0;
+      } else if (paymentMode === 'online') {
+        cash = 0; online = netAmount;
+      } else {
+        cash = parseFloat(cashAmt) || 0;
+        online = parseFloat(onlineAmt) || 0;
+      }
+      const updated = await updateSessionPayment(paymentTarget.id, {
+        cash_amount: cash,
+        online_amount: online,
+      });
+      setSessions((prev) => prev.map((s) =>
+        s.id === updated.id
+          ? { ...s, cash_amount: updated.cash_amount, online_amount: updated.online_amount, payment_method: updated.payment_method }
+          : s
+      ));
+      closePaymentEdit();
+    } catch (err: any) {
+      setPaymentError(err?.response?.data?.message ?? 'Failed to update payment');
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -240,7 +304,7 @@ export function Sessions() {
                           )}
                           {s.payment_method && (
                             <div className="text-xs text-gray-600 font-mono-game uppercase">
-                              {s.payment_method === 'cash' ? '💵 Cash' : '📱 Online'}
+                              {s.payment_method === 'cash' ? '💵 Cash' : s.payment_method === 'online' ? '📱 Online' : '💵📱 Split'}
                             </div>
                           )}
                         </td>
@@ -254,6 +318,13 @@ export function Sessions() {
                                 onClick={() => setEndModalSession(s)}
                                 className="text-xs font-bold tracking-widest uppercase text-red-700 hover:text-red-400 transition-colors whitespace-nowrap">
                                 ■ End →
+                              </button>
+                            )}
+                            {isAdmin && s.status === 'ended' && (
+                              <button
+                                onClick={() => openPaymentEdit(s)}
+                                className="text-xs font-bold tracking-widest uppercase text-cyan-700 hover:text-cyan-400 transition-colors whitespace-nowrap">
+                                ✎ Payment
                               </button>
                             )}
                             <button onClick={() => navigate(`/billing/${s.id}`)}
@@ -290,6 +361,76 @@ export function Sessions() {
           loadInitial();
         }}
       />
+
+      {/* Edit Payment Modal (admin only, closed sessions) */}
+      <Modal
+        open={!!paymentTarget}
+        onClose={closePaymentEdit}
+        title={`Edit Payment — Session #${paymentTarget?.id}`}
+      >
+        <form onSubmit={handlePaymentSubmit} className="flex flex-col gap-5">
+          <div>
+            <label className="game-label">Net Amount</label>
+            <p className="font-mono-game font-bold text-cyan-400 text-lg">
+              ₹{paymentTarget?.net_amount ? parseFloat(paymentTarget.net_amount).toFixed(2) : '0.00'}
+            </p>
+          </div>
+
+          <div>
+            <label className="game-label">Payment Method</label>
+            <div className="flex gap-3 mt-1">
+              {(['cash', 'online', 'split'] as PaymentMode[]).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setPaymentMode(m)}
+                  className={`px-4 py-2 text-xs font-bold tracking-widest uppercase border transition-colors ${
+                    paymentMode === m
+                      ? 'border-cyan-500 text-cyan-300 bg-cyan-900/20'
+                      : 'border-gray-700/40 text-gray-600 hover:text-gray-300 hover:border-gray-500/40'
+                  }`}
+                >
+                  {m === 'cash' ? '💵 Cash' : m === 'online' ? '📱 Online' : '💵📱 Split'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {paymentMode === 'split' && (
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="game-label">Cash Amount (₹)</label>
+                <input
+                  type="number" min="0" step="0.01"
+                  value={cashAmt}
+                  onChange={(e) => setCashAmt(e.target.value)}
+                  required className="game-input" placeholder="0.00"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="game-label">Online Amount (₹)</label>
+                <input
+                  type="number" min="0" step="0.01"
+                  value={onlineAmt}
+                  onChange={(e) => setOnlineAmt(e.target.value)}
+                  required className="game-input" placeholder="0.00"
+                />
+              </div>
+            </div>
+          )}
+
+          {paymentError && (
+            <div className="border border-red-800/40 bg-red-950/20 px-3 py-2 flex items-center gap-2">
+              <span className="text-red-400">⚠</span>
+              <p className="text-red-400 text-xs font-mono-game tracking-wide">{paymentError}</p>
+            </div>
+          )}
+
+          <button type="submit" disabled={paymentSubmitting} className="game-btn-primary">
+            {paymentSubmitting ? '// Saving…' : '▶ Save Payment'}
+          </button>
+        </form>
+      </Modal>
     </div>
   );
 }

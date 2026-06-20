@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Customer, CustomerSession } from '../../types';
-import { getCustomers, getCustomerSessions } from '../../api/customers';
+import { getCustomers, getCustomerSessions, updateCustomer } from '../../api/customers';
 import { Modal } from '../../components/Modal';
 import { Spinner } from '../../components/Spinner';
 import { ErrorMessage } from '../../components/ErrorMessage';
 import { Badge } from '../../components/Badge';
-
+import { useAuth } from '../../hooks/useAuth';
 
 const PAGE_LIMIT = 20;
 
@@ -14,6 +14,8 @@ function formatDate(iso: string) {
 }
 
 export function Customers() {
+  const { isAdmin } = useAuth();
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [hasNext, setHasNext] = useState(false);
   const [page, setPage] = useState(1);
@@ -31,6 +33,13 @@ export function Customers() {
   const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const historySentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Edit modal state
+  const [editTarget, setEditTarget] = useState<Customer | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState('');
 
   const loadInitial = useCallback(async () => {
     setLoading(true); setError(''); setPage(1);
@@ -91,6 +100,35 @@ export function Customers() {
       setHistoryHasNext(res.pagination.has_next);
     } catch {}
     finally { setHistoryLoadingMore(false); }
+  }
+
+  function openEdit(c: Customer) {
+    setEditTarget(c);
+    setEditName(c.name);
+    setEditPhone(c.phone);
+    setEditError('');
+  }
+
+  function closeEdit() {
+    setEditTarget(null);
+    setEditName('');
+    setEditPhone('');
+    setEditError('');
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editTarget) return;
+    setEditError(''); setEditSubmitting(true);
+    try {
+      const updated = await updateCustomer(editTarget.id, { name: editName, phone: editPhone });
+      setCustomers((prev) => prev.map((c) => c.id === updated.id ? updated : c));
+      closeEdit();
+    } catch (err: any) {
+      setEditError(err?.response?.data?.message ?? 'Failed to update customer');
+    } finally {
+      setEditSubmitting(false);
+    }
   }
 
   function handleSearchSubmit(e: React.FormEvent) {
@@ -156,10 +194,18 @@ export function Customers() {
                       <td className="px-5 py-3 font-mono-game text-cyan-600 text-xs">{c.phone}</td>
                       <td className="px-5 py-3 font-mono-game text-gray-600 text-xs">{formatDate(c.created_at)}</td>
                       <td className="px-5 py-3 text-right">
-                        <button onClick={() => openHistory(c)}
-                          className="px-3 py-1 text-xs font-bold tracking-widest uppercase border border-purple-700/40 text-purple-600 hover:bg-purple-900/20 hover:text-purple-300 transition-colors">
-                          History
-                        </button>
+                        <div className="flex items-center justify-end gap-2">
+                          {isAdmin && (
+                            <button onClick={() => openEdit(c)}
+                              className="px-3 py-1 text-xs font-bold tracking-widest uppercase border border-cyan-800/40 text-cyan-700 hover:bg-cyan-900/20 hover:text-cyan-400 transition-colors">
+                              Edit
+                            </button>
+                          )}
+                          <button onClick={() => openHistory(c)}
+                            className="px-3 py-1 text-xs font-bold tracking-widest uppercase border border-purple-700/40 text-purple-600 hover:bg-purple-900/20 hover:text-purple-300 transition-colors">
+                            History
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -175,6 +221,45 @@ export function Customers() {
           )}
         </div>
       )}
+
+      {/* Edit Customer Modal (admin only) */}
+      <Modal open={!!editTarget} onClose={closeEdit} title={`Edit Customer — #${editTarget?.id}`}>
+        <form onSubmit={handleEditSubmit} className="flex flex-col gap-5">
+          <div>
+            <label className="game-label">Name</label>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              required maxLength={150}
+              placeholder="Customer name"
+              className="game-input"
+            />
+          </div>
+          <div>
+            <label className="game-label">Phone (10 digits)</label>
+            <input
+              type="text"
+              value={editPhone}
+              onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+              required pattern="[6-9][0-9]{9}"
+              placeholder="9876543210"
+              className="game-input"
+            />
+          </div>
+
+          {editError && (
+            <div className="border border-red-800/40 bg-red-950/20 px-3 py-2 flex items-center gap-2">
+              <span className="text-red-400">⚠</span>
+              <p className="text-red-400 text-xs font-mono-game tracking-wide">{editError}</p>
+            </div>
+          )}
+
+          <button type="submit" disabled={editSubmitting} className="game-btn-primary">
+            {editSubmitting ? '// Saving…' : '▶ Save Changes'}
+          </button>
+        </form>
+      </Modal>
 
       {/* Session History Modal */}
       <Modal open={!!historyTarget} onClose={() => { setHistoryTarget(null); setHistory([]); }} title={`Session History — ${historyTarget?.name}`}>

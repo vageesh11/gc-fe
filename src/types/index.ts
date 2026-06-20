@@ -25,6 +25,8 @@ export interface GamingTable {
   status: TableStatus;
   price_per_minute: string;
   price_per_hour: string;
+  wiz_ip?: string | null;
+  wiz_mac?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -435,4 +437,13 @@ export interface TablePreBookedEvent {
 export interface TableBookingCancelledEvent {
   tableId: number;
   sessionId: number;
+}
+
+export interface SessionFixedSlotExpiredEvent {
+  sessionId: number;
+  tableId: number;
+  tableName: string;
+  tableType: string;
+  netAmount: string;
+  customerName: string | null;
 }

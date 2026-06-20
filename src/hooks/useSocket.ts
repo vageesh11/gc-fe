@@ -8,6 +8,7 @@ import type {
   SessionResumedEvent,
   TablePreBookedEvent,
   TableBookingCancelledEvent,
+  SessionFixedSlotExpiredEvent,
 } from '../types';
 
 interface SocketHandlers {
@@ -18,6 +19,7 @@ interface SocketHandlers {
   onSessionResumed?: (data: SessionResumedEvent) => void;
   onTablePreBooked?: (data: TablePreBookedEvent) => void;
   onTableBookingCancelled?: (data: TableBookingCancelledEvent) => void;
+  onSessionFixedSlotExpired?: (data: SessionFixedSlotExpiredEvent) => void;
 }
 
 export function useSocket(handlers: SocketHandlers) {
@@ -52,6 +54,9 @@ export function useSocket(handlers: SocketHandlers) {
     });
     socket.on('table_booking_cancelled', (data: TableBookingCancelledEvent) => {
       handlersRef.current.onTableBookingCancelled?.(data);
+    });
+    socket.on('session_fixed_slot_expired', (data: SessionFixedSlotExpiredEvent) => {
+      handlersRef.current.onSessionFixedSlotExpired?.(data);
     });
 
     return () => { socket.disconnect(); };

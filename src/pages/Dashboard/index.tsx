@@ -9,6 +9,8 @@ import { StartSessionModal } from './StartSessionModal';
 import { EndSessionModal } from './EndSessionModal';
 import { AddTableModal } from './AddTableModal';
 import { AddOrderModal } from './AddOrderModal';
+import { SnacksOrderModal } from './SnacksOrderModal';
+import { FixedSlotExpiredModal } from './FixedSlotExpiredModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { AlertDialog } from '../../components/AlertDialog';
 import { Spinner } from '../../components/Spinner';
@@ -38,6 +40,8 @@ export function Dashboard() {
   const [endModal, setEndModal] = useState<{ table: GamingTable; session: ActiveTableSession } | null>(null);
   const [showAddTable, setShowAddTable] = useState(false);
   const [orderModal, setOrderModal] = useState<{ table: GamingTable; session: ActiveTableSession } | null>(null);
+  const [showSnacksOrder, setShowSnacksOrder] = useState(false);
+  const [expiredSession, setExpiredSession] = useState<{ sessionId: number; tableName: string; netAmount: string; customerName: string | null } | null>(null);
 
   const [confirm, setConfirm] = useState<ConfirmState>({ open: false, title: '', message: '', onConfirm: () => {} });
   const [alertMsg, setAlertMsg] = useState('');
@@ -65,6 +69,11 @@ export function Dashboard() {
     onSessionResumed: ({ tableId }) => { setTableStatus(tableId, 'OCCUPIED'); bump(); },
     onTablePreBooked: ({ tableId }) => { setTableStatus(tableId, 'RESERVED'); bump(); },
     onTableBookingCancelled: ({ tableId }) => { setTableStatus(tableId, 'AVAILABLE'); bump(); },
+    onSessionFixedSlotExpired: ({ sessionId, tableId, tableName, netAmount, customerName }) => {
+      setTableStatus(tableId, 'AVAILABLE');
+      bump();
+      setExpiredSession({ sessionId, tableName, netAmount, customerName });
+    },
   });
 
   function askConfirm(cfg: Omit<ConfirmState, 'open'>) {
@@ -183,14 +192,22 @@ export function Dashboard() {
             {reservedCount > 0 && <span className="text-sm font-mono-game"><span className="text-blue-400">{reservedCount}</span><span className="text-gray-600"> reserved</span></span>}
           </div>
         </div>
-        {isAdmin && (
-          <button onClick={() => setShowAddTable(true)}
+        <div className="flex gap-3">
+          <button onClick={() => setShowSnacksOrder(true)}
             className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold tracking-widest uppercase
-              bg-purple-600/20 border border-purple-500/60 text-purple-300
-              hover:bg-purple-600/40 hover:text-white transition-all duration-200 glow-purple">
-            + New Table
+              bg-cyan-600/20 border border-cyan-500/60 text-cyan-300
+              hover:bg-cyan-600/40 hover:text-white transition-all duration-200">
+            🍟 Snacks Order
           </button>
-        )}
+          {isAdmin && (
+            <button onClick={() => setShowAddTable(true)}
+              className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold tracking-widest uppercase
+                bg-purple-600/20 border border-purple-500/60 text-purple-300
+                hover:bg-purple-600/40 hover:text-white transition-all duration-200 glow-purple">
+              + New Table
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filter tabs */}
@@ -276,6 +293,18 @@ export function Dashboard() {
         session={orderModal?.session ?? null}
         onClose={() => setOrderModal(null)}
         onOrderAdded={bump}
+      />
+      <SnacksOrderModal
+        open={showSnacksOrder}
+        onClose={() => setShowSnacksOrder(false)}
+        onOrderPlaced={() => {}}
+      />
+      <FixedSlotExpiredModal
+        open={!!expiredSession}
+        sessionId={expiredSession?.sessionId ?? null}
+        tableName={expiredSession?.tableName ?? ''}
+        customerName={expiredSession?.customerName ?? null}
+        onClose={() => setExpiredSession(null)}
       />
 
       <ConfirmDialog

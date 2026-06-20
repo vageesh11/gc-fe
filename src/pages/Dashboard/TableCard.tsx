@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type { GamingTable, ActiveTableSession } from '../../types';
 import { getTableActiveSession } from '../../api/tables';
 import { Badge } from '../../components/Badge';
@@ -26,6 +26,58 @@ interface TableCardProps {
   refreshSignal?: number;
 }
 
+/**
+ * Live countdown for fixed_slot sessions.
+ * - Active: ticks every second from last-known billable elapsed (duration_min from poll).
+ * - Paused: frozen — no ticker, remaining is stable until resumed.
+ */
+function useFixedSlotCountdown(
+  session: ActiveTableSession | null,
+  isPaused: boolean
+): number | null {
+  const [remainingSecs, setRemainingSecs] = useState<number | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    // Clear any existing ticker
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+
+    if (!session || session.booking_type !== 'fixed_slot' || !session.booked_duration) {
+      setRemainingSecs(null);
+      return;
+    }
+
+    const totalSecs     = session.booked_duration * 60;
+    const elapsedSecs   = (session.duration_min ?? 0) * 60; // billable elapsed at last poll
+    const pollTimestamp = Date.now();
+
+    const calc = () => {
+      if (isPaused) return Math.max(totalSecs - elapsedSecs, 0);
+      const secsSincePoll = Math.floor((Date.now() - pollTimestamp) / 1000);
+      return Math.max(totalSecs - elapsedSecs - secsSincePoll, 0);
+    };
+
+    setRemainingSecs(calc());
+
+    if (!isPaused) {
+      intervalRef.current = setInterval(() => setRemainingSecs(calc()), 1000);
+    }
+
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  // Re-run when session id, elapsed minutes, or pause state changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id, session?.duration_min, isPaused]);
+
+  return remainingSecs;
+}
+
+function fmtCountdown(secs: number): string {
+  if (secs <= 0) return '00:00';
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 export function TableCard({
   table, onStartSession, onEndSession, onPauseSession, onResumeSession,
   onConfirmBooking, onCancelBooking, onAddOrder, onViewBill, refreshSignal,
@@ -35,9 +87,14 @@ export function TableCard({
 
   const accent = TYPE_ACCENT[table.type] ?? TYPE_ACCENT.pool;
   const isOccupied = table.status === 'OCCUPIED';
-  const isPaused = table.status === 'PAUSED';
+  const isPaused   = table.status === 'PAUSED';
   const isReserved = table.status === 'RESERVED';
-  const isActive = isOccupied || isPaused || isReserved;
+  const isActive   = isOccupied || isPaused || isReserved;
+
+  const isFixedSlot   = session?.booking_type === 'fixed_slot';
+  const remainingSecs = useFixedSlotCountdown(session, isPaused);
+  const isExpiring    = remainingSecs !== null && remainingSecs <= 300 && remainingSecs > 0; // last 5 min
+  const isOvertime    = remainingSecs !== null && remainingSecs === 0;
 
   const fetchSession = useCallback(async () => {
     if (table.status === 'AVAILABLE') { setSession(null); return; }
@@ -49,33 +106,35 @@ export function TableCard({
 
   useEffect(() => { fetchSession(); }, [fetchSession, refreshSignal]);
 
-  // Only poll while actively billing (not paused, not reserved)
+  // Poll every 30s while actively billing; poll every 10s in last 5 min to stay fresh
   useEffect(() => {
     if (!isOccupied) return;
-    const id = setInterval(fetchSession, 30_000);
+    const interval = isExpiring ? 10_000 : 30_000;
+    const id = setInterval(fetchSession, interval);
     return () => clearInterval(id);
-  }, [isOccupied, fetchSession]);
+  }, [isOccupied, isExpiring, fetchSession]);
 
   // Card border colour by status
   const cardBorder = isOccupied
-    ? 'border-red-500/60 shadow-lg shadow-red-900/20'
+    ? isExpiring
+      ? 'border-orange-500/70 shadow-lg shadow-orange-900/30'
+      : 'border-red-500/60 shadow-lg shadow-red-900/20'
     : isPaused
     ? 'border-amber-500/50 shadow-lg shadow-amber-900/20'
     : isReserved
     ? 'border-blue-500/60 shadow-lg shadow-blue-900/20'
     : `${accent.border} hover:shadow-lg`;
 
-  // Corner accent colour
   const cornerColor = isOccupied
-    ? 'border-red-400'
-    : isPaused
-    ? 'border-amber-400'
-    : isReserved
-    ? 'border-blue-400'
+    ? isExpiring ? 'border-orange-400' : 'border-red-400'
+    : isPaused   ? 'border-amber-400'
+    : isReserved ? 'border-blue-400'
     : accent.text.replace('text-', 'border-');
 
-  // Pulse colour
-  const pulseColor = isOccupied ? 'bg-red-400' : isPaused ? 'bg-amber-400' : 'bg-blue-400';
+  const pulseColor = isOccupied
+    ? isExpiring ? 'bg-orange-400' : 'bg-red-400'
+    : isPaused   ? 'bg-amber-400'
+    : 'bg-blue-400';
 
   return (
     <div className={`relative flex flex-col gap-4 p-5 border transition-all duration-300 bg-[#0d0d1a] ${cardBorder}`}>
@@ -126,7 +185,6 @@ export function TableCard({
             <div className="flex justify-center py-2"><Spinner size="sm" /></div>
           ) : session ? (
             <div className="flex flex-col gap-2">
-              {/* Customer name always shown for reserved */}
               {session.customer_name && (
                 <div className="flex justify-between">
                   <span className="text-gray-500 text-xs tracking-wider uppercase">Customer</span>
@@ -143,7 +201,6 @@ export function TableCard({
               )}
 
               {isReserved ? (
-                /* Reserved — show scheduled time */
                 <>
                   {session.scheduled_start && (
                     <div className="flex justify-between">
@@ -162,7 +219,6 @@ export function TableCard({
                   <div className="text-xs text-blue-800 font-mono-game mt-1 tracking-wider">AWAITING ARRIVAL</div>
                 </>
               ) : (
-                /* Active/Paused — show billing */
                 <>
                   <div className="flex justify-between">
                     <span className="text-gray-500 text-xs tracking-wider uppercase">Duration</span>
@@ -176,12 +232,42 @@ export function TableCard({
                       ₹{parseFloat(session.session_amount ?? '0').toFixed(2)}
                     </span>
                   </div>
+
+                  {/* ── Fixed-slot countdown ── */}
+                  {isFixedSlot && remainingSecs !== null && (
+                    <div className={`mt-1 border px-3 py-2 flex items-center justify-between ${
+                      isPaused
+                        ? 'border-amber-800/40 bg-amber-950/20'
+                        : isExpiring
+                        ? 'border-orange-700/50 bg-orange-950/20'
+                        : 'border-purple-900/40 bg-[#07070f]'
+                    }`}>
+                      <span className="text-xs uppercase tracking-wider font-mono-game text-gray-500">
+                        {isPaused ? 'Remaining (paused)' : 'Time left'}
+                      </span>
+                      <span className={`font-mono-game font-black text-lg tabular-nums ${
+                        isPaused
+                          ? 'text-amber-400'
+                          : isExpiring
+                          ? 'text-orange-400 animate-pulse'
+                          : 'text-cyan-400'
+                      }`}>
+                        {fmtCountdown(remainingSecs)}
+                      </span>
+                    </div>
+                  )}
+
                   {isPaused && (
                     <div className="text-xs text-amber-700 font-mono-game mt-1 tracking-wider">⏸ CLOCK PAUSED</div>
                   )}
-                  {isOccupied && (
+                  {isOccupied && !isFixedSlot && (
                     <div className="text-xs text-gray-600 font-mono-game mt-1">
                       SINCE {new Date(session.start_time).toLocaleTimeString()}
+                    </div>
+                  )}
+                  {isExpiring && isOccupied && (
+                    <div className="text-xs text-orange-600 font-mono-game mt-1 tracking-wider animate-pulse">
+                      ⚠ SLOT ENDING SOON
                     </div>
                   )}
                 </>
@@ -202,7 +288,6 @@ export function TableCard({
             ▶ Start Session
           </button>
         ) : isReserved ? (
-          /* Reserved actions */
           <>
             <button onClick={() => session && onConfirmBooking(table, session)}
               disabled={!session}
@@ -218,7 +303,6 @@ export function TableCard({
             </button>
           </>
         ) : (
-          /* Occupied / Paused actions */
           <>
             {session && isOccupied && (
               <button onClick={() => onAddOrder(table, session)}
@@ -234,6 +318,7 @@ export function TableCard({
                 ◎ View Bill
               </button>
             )}
+            {/* Pause — available for all session types including fixed_slot */}
             {session && isOccupied && (
               <button onClick={() => onPauseSession(table, session)}
                 className="w-full py-2 px-4 text-xs font-bold tracking-widest uppercase transition-all
@@ -241,6 +326,7 @@ export function TableCard({
                 ⏸ Pause
               </button>
             )}
+            {/* Resume — freezes countdown until pressed */}
             {session && isPaused && (
               <button onClick={() => onResumeSession(table, session)}
                 className="w-full py-2 px-4 text-xs font-bold tracking-widest uppercase transition-all

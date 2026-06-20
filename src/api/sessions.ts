@@ -38,6 +38,14 @@ export async function endSession(payload: EndSessionPayload): Promise<EndSession
   return res.data.data;
 }
 
+export async function updateSessionPayment(
+  sessionId: number,
+  payload: { cash_amount: number; online_amount: number }
+): Promise<{ id: number; cash_amount: string; online_amount: string; payment_method: string }> {
+  const res = await client.patch(`/sessions/${sessionId}/payment`, payload);
+  return res.data.data;
+}
+
 export async function pauseSession(session_id: number): Promise<PauseResumeResponse> {
   const res = await client.post('/sessions/pause', { session_id });
   return res.data.data;

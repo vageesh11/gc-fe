@@ -118,8 +118,8 @@ export function StartSessionModal({ open, table, onClose, onStarted }: StartSess
                 value={customerName}
                 onChange={(e) => handleNameChange(e.target.value)}
                 onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
-                required maxLength={150}
-                placeholder="e.g. Rahul Kumar"
+                maxLength={150}
+                placeholder="e.g. Rahul Kumar (optional)"
                 className="game-input"
                 autoComplete="off"
               />
@@ -151,7 +151,7 @@ export function StartSessionModal({ open, table, onClose, onStarted }: StartSess
             <label className="game-label">Phone (10 digits)</label>
             <input type="text" value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-              required pattern="[6-9][0-9]{9}" placeholder="9876543210" className="game-input" />
+              pattern="[6-9][0-9]{9}" placeholder="9876543210 (optional)" className="game-input" />
           </div>
         </div>
 
@@ -216,9 +216,9 @@ export function StartSessionModal({ open, table, onClose, onStarted }: StartSess
                 </button>
               ))}
             </div>
-            <input type="number" min="1" value={bookedDuration}
+            <input type="number" min="5" step="5" value={bookedDuration}
               onChange={(e) => setBookedDuration(e.target.value)}
-              required className="game-input" placeholder="or enter custom minutes (e.g. 90)" />
+              required className="game-input" placeholder="or enter custom minutes (e.g. 90, 45)" />
             {bookedDuration && (
               <p className="text-purple-700 text-xs font-mono-game tracking-wide">
                 ◷ {Math.floor(parseInt(bookedDuration) / 60) > 0 ? `${Math.floor(parseInt(bookedDuration) / 60)}h ` : ''}{parseInt(bookedDuration) % 60 > 0 ? `${parseInt(bookedDuration) % 60}m` : ''}
