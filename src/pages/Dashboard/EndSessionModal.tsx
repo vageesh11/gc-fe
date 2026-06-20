@@ -5,6 +5,7 @@ import { getBill } from '../../api/billing';
 import { Modal } from '../../components/Modal';
 import { DiscountPicker } from '../../components/DiscountPicker';
 import { Spinner } from '../../components/Spinner';
+import { PrintReceiptModal } from './PrintReceiptModal';
 
 interface EndSessionModalProps {
   open: boolean;
@@ -22,6 +23,10 @@ export function EndSessionModal({ open, table, session, onClose, onEnded }: EndS
   const [onlineInput, setOnlineInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [showPrint, setShowPrint] = useState(false);
+  const [finalBill, setFinalBill] = useState<Bill | null>(null);
+  const [finalCash, setFinalCash] = useState(0);
+  const [finalOnline, setFinalOnline] = useState(0);
 
   useEffect(() => {
     if (!open || !session) return;
@@ -95,6 +100,14 @@ export function EndSessionModal({ open, table, session, onClose, onEnded }: EndS
         payload.discount_value = parseFloat(selectedDiscount.discount_value);
       }
       await endSession(payload);
+      // Fetch the final closed bill for the receipt
+      try {
+        const closed = await getBill(session.id);
+        setFinalBill(closed);
+        setFinalCash(cashVal);
+        setFinalOnline(onlineVal);
+        setShowPrint(true);
+      } catch { /* print is optional — proceed even if bill fetch fails */ }
       onEnded();
       onClose();
     } catch (err: any) {
@@ -114,6 +127,7 @@ export function EndSessionModal({ open, table, session, onClose, onEnded }: EndS
     : '';
 
   return (
+    <>
     <Modal open={open} onClose={onClose} title={`End Session — ${table?.name ?? ''}`}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 
@@ -290,5 +304,17 @@ export function EndSessionModal({ open, table, session, onClose, onEnded }: EndS
         </button>
       </form>
     </Modal>
+
+    {/* Print receipt — opens automatically after session ends */}
+    {finalBill && (
+      <PrintReceiptModal
+        open={showPrint}
+        bill={finalBill}
+        cashAmount={finalCash}
+        onlineAmount={finalOnline}
+        onClose={() => { setShowPrint(false); setFinalBill(null); }}
+      />
+    )}
+  </>
   );
 }

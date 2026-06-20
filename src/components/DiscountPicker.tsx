@@ -55,16 +55,22 @@ export function DiscountPicker({ onSelect, selected }: DiscountPickerProps) {
     const val = d.discount_type === 'percentage'
       ? `${parseFloat(d.discount_value).toFixed(0)}% off`
       : `₹${parseFloat(d.discount_value).toFixed(2)} off`;
-    return { name: d.name, code: d.code, val };
+    const scopeLabel = d.scope === 'session'
+      ? 'Table only'
+      : d.scope === 'order'
+      ? 'Snacks only'
+      : 'Table + Snacks';
+    return { name: d.name, code: d.code, val, scopeLabel };
   }
 
   // If a discount is already selected, show the applied pill
   if (selected) {
-    const { name, code, val } = discountLabel(selected);
+    const { name, code, val, scopeLabel } = discountLabel(selected);
     return (
       <div className="flex items-center justify-between bg-cyan-900/10 border border-cyan-700/30 px-3 py-2">
         <div>
           <p className="text-cyan-400 text-xs font-semibold tracking-wide">{name} — {val}</p>
+          <p className="text-purple-700 text-xs font-mono-game mt-0.5">applies to: {scopeLabel}</p>
           {code && <p className="text-gray-600 text-xs font-mono-game mt-0.5">{code}</p>}
         </div>
         <button type="button" onClick={handleClear}
@@ -96,7 +102,7 @@ export function DiscountPicker({ onSelect, selected }: DiscountPickerProps) {
             </p>
           ) : (
             filtered.map((d) => {
-              const { name, code, val } = discountLabel(d);
+              const { name, code, val, scopeLabel } = discountLabel(d);
               return (
                 <button
                   key={d.id}
@@ -106,6 +112,7 @@ export function DiscountPicker({ onSelect, selected }: DiscountPickerProps) {
                 >
                   <div>
                     <p className="text-gray-200 text-xs font-semibold">{name}</p>
+                    <p className="text-purple-700 text-xs font-mono-game mt-0.5">{scopeLabel}</p>
                     {code && (
                       <span className="font-mono-game text-xs text-amber-400 border border-amber-800/40 bg-amber-900/10 px-1.5 py-0.5 mt-0.5 inline-block">
                         {code}
