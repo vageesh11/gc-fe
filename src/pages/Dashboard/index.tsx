@@ -191,6 +191,44 @@ export function Dashboard() {
             {pausedCount > 0 && <span className="text-sm font-mono-game"><span className="text-amber-400">{pausedCount}</span><span className="text-gray-600"> paused</span></span>}
             {reservedCount > 0 && <span className="text-sm font-mono-game"><span className="text-blue-400">{reservedCount}</span><span className="text-gray-600"> reserved</span></span>}
           </div>
+
+          {/* SVG activity bar */}
+          {tables.length > 0 && (
+            <div className="mt-3 flex items-center gap-3">
+              <svg width="180" height="28" viewBox="0 0 180 28" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <style>{`
+                    @keyframes db-bar-grow{0%{transform:scaleY(0.2)}100%{transform:scaleY(1)}}
+                    @keyframes db-blink{0%,100%{opacity:1}50%{opacity:0.3}}
+                    .db-bar{transform-origin:bottom;animation:db-bar-grow 1s ease-out forwards}
+                    .db-blink{animation:db-blink 1.4s ease-in-out infinite}
+                  `}</style>
+                </defs>
+                {/* Bar chart — one bar per table, colour by status */}
+                {tables.slice(0, 18).map((t, i) => {
+                  const x = i * 10 + 1;
+                  const h = t.status === 'OCCUPIED' ? 22 : t.status === 'PAUSED' ? 14 : t.status === 'RESERVED' ? 18 : 6;
+                  const color = t.status === 'OCCUPIED' ? '#ef4444' : t.status === 'PAUSED' ? '#f59e0b' : t.status === 'RESERVED' ? '#3b82f6' : '#374151';
+                  return (
+                    <rect key={t.id}
+                      className="db-bar"
+                      x={x} y={27 - h} width="7" height={h}
+                      fill={color} fillOpacity={t.status === 'AVAILABLE' ? 0.3 : 0.75}
+                      rx="1"
+                      style={{ animationDelay: `${i * 0.05}s` }}
+                    />
+                  );
+                })}
+                {/* Baseline */}
+                <line x1="0" y1="27" x2="180" y2="27" stroke="#374151" strokeWidth="1" strokeOpacity="0.5" />
+                {/* Live dot */}
+                {occupiedCount > 0 && (
+                  <circle className="db-blink" cx="174" cy="6" r="4" fill="#ef4444" fillOpacity="0.8" />
+                )}
+              </svg>
+              <span className="text-xs font-mono-game text-gray-700 tracking-wider hidden sm:inline">TABLE ACTIVITY</span>
+            </div>
+          )}
         </div>
         <div className="flex gap-3">
           <button onClick={() => setShowSnacksOrder(true)}
