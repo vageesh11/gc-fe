@@ -52,7 +52,7 @@ export interface ActiveTableSession {
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
 export type SessionStatus = 'active' | 'paused' | 'reserved' | 'ended' | 'cancelled';
-export type BookingType = 'pay_as_you_go' | 'fixed_slot' | 'pre_booking';
+export type BookingType = 'pay_as_you_go' | 'fixed_slot' | 'pre_booking' | 'frame_wise';
 export type DiscountType = 'none' | 'percentage' | 'flat' | 'pass';
 export type BillStatus = 'ACTIVE' | 'PAUSED' | 'CLOSED';
 
@@ -90,6 +90,19 @@ export interface StartSessionPayload {
   booking_type?: BookingType;
   scheduled_start?: string | null;
   booked_duration?: number | null;
+}
+
+// ─── Frames ───────────────────────────────────────────────────────────────────
+
+export interface SessionFrame {
+  id: number;
+  session_id: number;
+  player_name: string;
+  started_at: string;
+  ended_at: string | null;
+  duration_min: number | null;
+  amount: string | null;
+  created_at: string;
 }
 
 export interface StartSessionResponse {
@@ -199,6 +212,7 @@ export interface Bill {
   status: BillStatus;
   pauses: PauseRecord[];
   orders: Order[];
+  frames?: SessionFrame[];
 }
 
 // ─── Customers ────────────────────────────────────────────────────────────────
@@ -274,6 +288,7 @@ export interface Discount {
   discount_type: 'percentage' | 'flat';
   discount_value: string;
   scope: DiscountScope;
+  applicable_table_types: TableType[] | null;
   is_active: boolean;
   valid_from: string | null;
   valid_until: string | null;

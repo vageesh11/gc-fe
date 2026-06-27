@@ -22,6 +22,7 @@ interface TableCardProps {
   onConfirmBooking: (table: GamingTable, session: ActiveTableSession) => void;
   onCancelBooking: (table: GamingTable, session: ActiveTableSession) => void;
   onAddOrder: (table: GamingTable, session: ActiveTableSession) => void;
+  onManageFrames: (table: GamingTable, session: ActiveTableSession) => void;
   onViewBill: (sessionId: number) => void;
   refreshSignal?: number;
 }
@@ -80,7 +81,7 @@ function fmtCountdown(secs: number): string {
 
 export function TableCard({
   table, onStartSession, onEndSession, onPauseSession, onResumeSession,
-  onConfirmBooking, onCancelBooking, onAddOrder, onViewBill, refreshSignal,
+  onConfirmBooking, onCancelBooking, onAddOrder, onManageFrames, onViewBill, refreshSignal,
 }: TableCardProps) {
   const [session, setSession] = useState<ActiveTableSession | null>(null);
   const [loadingSession, setLoadingSession] = useState(false);
@@ -304,6 +305,13 @@ export function TableCard({
           </>
         ) : (
           <>
+            {session && isOccupied && session.booking_type === 'frame_wise' && (
+              <button onClick={() => onManageFrames(table, session)}
+                className="w-full py-2 px-4 text-xs font-bold tracking-widest uppercase transition-all
+                  bg-emerald-600/10 border border-emerald-600/40 text-emerald-400 hover:bg-emerald-600/20 hover:text-emerald-200">
+                🎱 Manage Frames
+              </button>
+            )}
             {session && isOccupied && (
               <button onClick={() => onAddOrder(table, session)}
                 className="w-full py-2 px-4 text-xs font-bold tracking-widest uppercase transition-all
@@ -311,13 +319,7 @@ export function TableCard({
                 + Add Order
               </button>
             )}
-            {session && (
-              <button onClick={() => onViewBill(session.id)}
-                className="w-full py-2 px-4 text-xs font-bold tracking-widest uppercase transition-all
-                  bg-gray-700/20 border border-gray-600/30 text-gray-400 hover:bg-gray-700/40 hover:text-gray-200">
-                ◎ View Bill
-              </button>
-            )}
+
             {/* Pause — available for all session types including fixed_slot */}
             {session && isOccupied && (
               <button onClick={() => onPauseSession(table, session)}

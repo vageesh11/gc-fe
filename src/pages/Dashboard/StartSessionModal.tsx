@@ -162,10 +162,16 @@ export function StartSessionModal({ open, table, onClose, onStarted }: StartSess
             <option value="pay_as_you_go">Pay As You Go</option>
             <option value="fixed_slot">Fixed Slot</option>
             <option value="pre_booking">Pre-Booking (Reserve)</option>
+            <option value="frame_wise">Frame Wise</option>
           </select>
           {isPreBooking && (
             <p className="text-blue-600 text-xs font-mono-game mt-1.5 tracking-wide">
               🔵 Table will be marked RESERVED. Clock starts when customer arrives.
+            </p>
+          )}
+          {bookingType === 'frame_wise' && (
+            <p className="text-emerald-700 text-xs font-mono-game mt-1.5 tracking-wide">
+              🎱 Board occupied, billed per frame. Add player frames from the table card.
             </p>
           )}
         </div>

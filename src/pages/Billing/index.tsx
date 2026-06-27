@@ -89,7 +89,7 @@ export function Billing() {
             <div>
               <h1 className="font-orbitron font-black text-lg text-white tracking-wide">{bill.table_name}</h1>
               <p className="text-xs text-gray-500 capitalize tracking-wider font-mono-game mt-0.5">
-                {bill.table_type} · <span className="text-cyan-600">₹{parseFloat(bill.price_per_minute).toFixed(2)}/min</span>
+                {bill.table_type} · <span className="text-cyan-600">₹{Math.round(parseFloat(bill.price_per_minute) * 60)}/hr</span>
                 {' · '}<span className="text-purple-600 uppercase">{bill.booking_type?.replace(/_/g, ' ')}</span>
               </p>
               {bill.customer_name && (
@@ -134,6 +134,24 @@ export function Billing() {
           </div>
         )}
 
+        {/* Frames (frame_wise sessions) */}
+        {bill.booking_type === 'frame_wise' && bill.frames && bill.frames.filter(f => f.ended_at).length > 0 && (
+          <div className="px-6 py-4 border-b border-purple-900/20">
+            <p className="font-orbitron text-xs text-purple-600 tracking-widest mb-3 uppercase">// Frames</p>
+            <div className="flex flex-col gap-0">
+              {bill.frames.filter(f => f.ended_at).map((f, i) => (
+                <div key={f.id} className={`flex justify-between items-center py-2 ${i < bill.frames!.filter(x=>x.ended_at).length - 1 ? 'border-b border-gray-800/30' : ''}`}>
+                  <div>
+                    <span className="text-gray-300 font-semibold text-sm">{f.player_name}</span>
+                    <span className="text-gray-600 ml-2 font-mono-game text-xs">{Math.ceil(Number(f.duration_min))} min</span>
+                  </div>
+                  <span className="font-mono-game font-bold text-cyan-400">₹{Math.round(parseFloat(f.amount ?? '0'))}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Orders */}
         {bill.orders.length > 0 && (
           <div className="px-6 py-4 border-b border-purple-900/20">
@@ -146,8 +164,8 @@ export function Billing() {
                     <span className="text-gray-600 ml-2 font-mono-game text-xs">× {order.quantity}</span>
                   </div>
                   <div className="text-right">
-                    <span className="font-mono-game font-bold text-cyan-400">₹{parseFloat(order.subtotal).toFixed(2)}</span>
-                    <span className="text-xs text-gray-700 ml-1 font-mono-game">(₹{parseFloat(order.unit_price).toFixed(2)} ea)</span>
+                    <span className="font-mono-game font-bold text-cyan-400">₹{Math.round(parseFloat(order.subtotal))}</span>
+                    <span className="text-xs text-gray-700 ml-1 font-mono-game">(₹{Math.round(parseFloat(order.unit_price))} ea)</span>
                   </div>
                 </div>
               ))}
@@ -157,27 +175,35 @@ export function Billing() {
 
         {/* Totals */}
         <div className="px-6 py-4 bg-[#0a0a12] flex flex-col gap-2 text-sm">
-          <div className="flex justify-between text-gray-500">
-            <span className="tracking-wider">Table time ({bill.duration_min} min)</span>
-            <span className="font-mono-game">₹{sessionAmount.toFixed(2)}</span>
-          </div>
+          {bill.booking_type !== 'frame_wise' && (
+            <div className="flex justify-between text-gray-500">
+              <span className="tracking-wider">Table time ({bill.duration_min} min)</span>
+              <span className="font-mono-game">₹{Math.round(sessionAmount)}</span>
+            </div>
+          )}
+          {bill.booking_type === 'frame_wise' && (
+            <div className="flex justify-between text-gray-500">
+              <span className="tracking-wider">Frames total ({bill.frames?.filter(f=>f.ended_at).length ?? 0} frames)</span>
+              <span className="font-mono-game">₹{Math.round(sessionAmount)}</span>
+            </div>
+          )}
           {ordersTotal > 0 && (
             <div className="flex justify-between text-gray-500">
               <span className="tracking-wider">Orders ({bill.orders.length} item{bill.orders.length !== 1 ? 's' : ''})</span>
-              <span className="font-mono-game">₹{ordersTotal.toFixed(2)}</span>
+              <span className="font-mono-game">₹{Math.round(ordersTotal)}</span>
             </div>
           )}
           <div className="flex justify-between text-gray-500">
             <span className="tracking-wider">Gross total</span>
-            <span className="font-mono-game">₹{totalAmount.toFixed(2)}</span>
+            <span className="font-mono-game">₹{Math.round(totalAmount)}</span>
           </div>
           {discountAmount > 0 && (
             <div className="flex justify-between text-emerald-700">
               <span className="tracking-wider">
                 Discount ({bill.discount_type?.replace(/_/g, ' ')}
-                {bill.discount_type === 'percentage' ? ` ${parseFloat(bill.discount_value).toFixed(0)}%` : ''})
+                {bill.discount_type === 'percentage' ? ` ${Math.round(parseFloat(bill.discount_value))}%` : ''})
               </span>
-              <span className="font-mono-game">−₹{discountAmount.toFixed(2)}</span>
+              <span className="font-mono-game">−₹{Math.round(discountAmount)}</span>
             </div>
           )}
           <div className="border-t border-purple-900/40 pt-3 mt-1 flex justify-between items-baseline">
@@ -185,7 +211,7 @@ export function Billing() {
               NET TOTAL {isLive ? <span className="text-xs text-gray-600">(est.)</span> : ''}
             </span>
             <span className="font-mono-game font-black text-2xl text-cyan-400 text-glow-cyan">
-              ₹{netAmount.toFixed(2)}
+              ₹{Math.round(netAmount)}
             </span>
           </div>
         </div>

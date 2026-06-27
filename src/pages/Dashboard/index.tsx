@@ -9,8 +9,8 @@ import { StartSessionModal } from './StartSessionModal';
 import { EndSessionModal } from './EndSessionModal';
 import { AddTableModal } from './AddTableModal';
 import { AddOrderModal } from './AddOrderModal';
-import { SnacksOrderModal } from './SnacksOrderModal';
 import { FixedSlotExpiredModal } from './FixedSlotExpiredModal';
+import { FrameSessionModal } from './FrameSessionModal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { AlertDialog } from '../../components/AlertDialog';
 import { Spinner } from '../../components/Spinner';
@@ -40,7 +40,7 @@ export function Dashboard() {
   const [endModal, setEndModal] = useState<{ table: GamingTable; session: ActiveTableSession } | null>(null);
   const [showAddTable, setShowAddTable] = useState(false);
   const [orderModal, setOrderModal] = useState<{ table: GamingTable; session: ActiveTableSession } | null>(null);
-  const [showSnacksOrder, setShowSnacksOrder] = useState(false);
+  const [frameModal, setFrameModal] = useState<{ table: GamingTable; session: ActiveTableSession } | null>(null);
   const [expiredSession, setExpiredSession] = useState<{ sessionId: number; tableName: string; netAmount: string; customerName: string | null } | null>(null);
 
   const [confirm, setConfirm] = useState<ConfirmState>({ open: false, title: '', message: '', onConfirm: () => {} });
@@ -231,12 +231,7 @@ export function Dashboard() {
           )}
         </div>
         <div className="flex gap-3">
-          <button onClick={() => setShowSnacksOrder(true)}
-            className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold tracking-widest uppercase
-              bg-cyan-600/20 border border-cyan-500/60 text-cyan-300
-              hover:bg-cyan-600/40 hover:text-white transition-all duration-200">
-            🍟 Snacks Order
-          </button>
+
           {isAdmin && (
             <button onClick={() => setShowAddTable(true)}
               className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold tracking-widest uppercase
@@ -285,6 +280,7 @@ export function Dashboard() {
                 onConfirmBooking={handleConfirmBooking}
                 onCancelBooking={handleCancelBooking}
                 onAddOrder={(t, s) => setOrderModal({ table: t, session: s })}
+                onManageFrames={(t, s) => setFrameModal({ table: t, session: s })}
                 onViewBill={(sessionId) => navigate(`/billing/${sessionId}`)}
                 refreshSignal={refreshSignal}
               />
@@ -332,11 +328,12 @@ export function Dashboard() {
         onClose={() => setOrderModal(null)}
         onOrderAdded={bump}
       />
-      <SnacksOrderModal
-        open={showSnacksOrder}
-        onClose={() => setShowSnacksOrder(false)}
-        onOrderPlaced={() => {}}
+      <FrameSessionModal
+        open={!!frameModal}
+        session={frameModal?.session ?? null}
+        onClose={() => setFrameModal(null)}
       />
+
       <FixedSlotExpiredModal
         open={!!expiredSession}
         sessionId={expiredSession?.sessionId ?? null}

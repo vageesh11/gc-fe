@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { Discount, DiscountScope } from '../../types';
+import type { Discount, DiscountScope, TableType } from '../../types';
 import {
   getDiscounts, createDiscount, updateDiscount, deleteDiscount,
 } from '../../api/discounts';
@@ -13,17 +13,20 @@ import { AlertDialog } from '../../components/AlertDialog';
 
 type ModalMode = 'add' | 'edit' | null;
 
+const ALL_TABLE_TYPES: TableType[] = ['pool', 'snooker', 'ps5'];
+
 interface FormState {
   name: string;
   code: string;
   discount_type: 'percentage' | 'flat';
   discount_value: string;
   scope: DiscountScope;
+  applicable_table_types: TableType[];
 }
 
 const EMPTY_FORM: FormState = {
   name: '', code: '', discount_type: 'percentage', discount_value: '',
-  scope: 'session',
+  scope: 'session', applicable_table_types: [],
 };
 
 export function Discounts() {
@@ -91,6 +94,7 @@ export function Discounts() {
       discount_type: d.discount_type,
       discount_value: parseFloat(d.discount_value).toString(),
       scope: d.scope,
+      applicable_table_types: d.applicable_table_types ?? [],
     });
     setFormError(''); setEditTarget(d); setModalMode('edit');
   }
@@ -123,6 +127,7 @@ export function Discounts() {
         discount_type: form.discount_type,
         discount_value: parseFloat(form.discount_value),
         scope: form.scope,
+        applicable_table_types: form.applicable_table_types.length > 0 ? form.applicable_table_types : null,
       };
       if (modalMode === 'add') {
         await createDiscount(payload);
@@ -137,7 +142,7 @@ export function Discounts() {
   }
 
   const scopeLabel = (s: DiscountScope) =>
-    s === 'session' ? 'Session' : s === 'order' ? 'Order' : 'All';
+    s === 'session' ? 'Table only' : s === 'order' ? 'Snacks only' : 'Table + Snacks';
 
   const modalTitle = modalMode === 'add' ? 'Create Discount' : `Edit — ${editTarget?.name}`;
 
@@ -276,10 +281,31 @@ export function Discounts() {
           <div>
             <label className="game-label">Scope</label>
             <select value={form.scope} onChange={(e) => setForm((f) => ({ ...f, scope: e.target.value as DiscountScope }))} className="game-input">
-              <option value="session">Session (table time)</option>
-              <option value="order">Order (snacks/drinks)</option>
-              <option value="all">All (session + orders)</option>
+              <option value="session">Table only</option>
+              <option value="order">Snacks only</option>
+              <option value="all">Table + Snacks</option>
             </select>
+          </div>
+          <div>
+            <label className="game-label">Applies to table types (leave blank = all tables)</label>
+            <div className="flex gap-4 mt-1">
+              {ALL_TABLE_TYPES.map((tt) => (
+                <label key={tt} className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="accent-purple-500 w-3.5 h-3.5"
+                    checked={form.applicable_table_types.includes(tt)}
+                    onChange={(e) => setForm((f) => ({
+                      ...f,
+                      applicable_table_types: e.target.checked
+                        ? [...f.applicable_table_types, tt]
+                        : f.applicable_table_types.filter((x) => x !== tt),
+                    }))}
+                  />
+                  <span className="text-xs text-gray-400 font-mono-game uppercase tracking-wider">{tt}</span>
+                </label>
+              ))}
+            </div>
           </div>
           {formError && <p className="text-red-400 text-xs font-mono-game border border-red-800/40 bg-red-950/20 px-3 py-2">⚠ {formError}</p>}
           <button type="submit" disabled={submitting} className="game-btn-primary">

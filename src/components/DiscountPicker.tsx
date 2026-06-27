@@ -1,27 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Discount } from '../types';
+import type { Discount, TableType } from '../types';
 import { getDiscounts } from '../api/discounts';
 
 interface DiscountPickerProps {
   onSelect: (discount: Discount | null) => void;
   selected: Discount | null;
+  tableType?: TableType;
 }
 
-export function DiscountPicker({ onSelect, selected }: DiscountPickerProps) {
+export function DiscountPicker({ onSelect, selected, tableType }: DiscountPickerProps) {
   const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Load all active discounts once
+  // Load discounts filtered by table type
   useEffect(() => {
     setLoading(true);
-    getDiscounts({ limit: 100 })
+    getDiscounts({ limit: 100, table_type: tableType })
       .then((res) => setDiscounts(res.data.filter((d) => d.is_active)))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [tableType]);
 
   // Close on outside click
   useEffect(() => {

@@ -5,6 +5,7 @@ export async function getDiscounts(params?: {
   page?: number;
   limit?: number;
   include_inactive?: boolean;
+  table_type?: 'pool' | 'snooker' | 'ps5';
 }): Promise<PaginatedResponse<Discount>> {
   const res = await client.get('/discounts', { params });
   return { data: res.data.data, pagination: res.data.pagination };
