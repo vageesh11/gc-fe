@@ -5,13 +5,14 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  dismissible?: boolean;
 }
 
-export function Modal({ open, onClose, title, children }: ModalProps) {
+export function Modal({ open, onClose, title, children, dismissible = true }: ModalProps) {
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && dismissible) onClose();
     };
     window.addEventListener('keydown', handler);
     document.body.style.overflow = 'hidden';
@@ -19,14 +20,14 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
       window.removeEventListener('keydown', handler);
       document.body.style.overflow = '';
     };
-  }, [open, onClose]);
+  }, [open, onClose, dismissible]);
 
   if (!open) return null;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget && dismissible) onClose(); }}
     >
       <div className="bg-[#0f0f1e] border border-purple-700/50 w-full max-w-lg mx-4 max-h-[90vh] flex flex-col shadow-2xl glow-purple">
         {/* Top accent */}
@@ -36,12 +37,14 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
           <h2 className="font-orbitron text-sm font-bold text-purple-300 tracking-widest uppercase">
             {title}
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-600 hover:text-purple-400 transition-colors text-xl leading-none font-bold"
-          >
-            ✕
-          </button>
+          {dismissible && (
+            <button
+              onClick={onClose}
+              className="text-gray-600 hover:text-purple-400 transition-colors text-xl leading-none font-bold"
+            >
+              ✕
+            </button>
+          )}
         </div>
         <div className="overflow-y-auto p-6">{children}</div>
       </div>

@@ -55,7 +55,7 @@ export function PaymentModal({ open, sessionId, bill, onDone }: PaymentModalProp
   }
 
   return (
-    <Modal open={open} onClose={onDone} title="// Payment">
+    <Modal open={open} onClose={onDone} title="// Payment" dismissible={false}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 
         {/* Collect amount */}

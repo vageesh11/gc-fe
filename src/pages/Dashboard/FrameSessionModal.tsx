@@ -10,13 +10,18 @@ interface Props {
 }
 
 export function FrameSessionModal({ open, session, onClose }: Props) {
-  const [frames, setFrames]           = useState<SessionFrame[]>([]);
-  const [playerName, setPlayerName]   = useState('');
-  const [loading, setLoading]         = useState(false);
-  const [submitting, setSubmitting]   = useState(false);
-  const [error, setError]             = useState('');
+  const [frames, setFrames]         = useState<SessionFrame[]>([]);
+  const [loading, setLoading]       = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError]           = useState('');
 
-  const activeFrame = frames.find(f => !f.ended_at) ?? null;
+  // Player name is entered when ENDING a frame
+  const [endingFrameId, setEndingFrameId] = useState<number | null>(null);
+  const [playerName, setPlayerName]       = useState('');
+
+  const activeFrame    = frames.find(f => !f.ended_at) ?? null;
+  const completedFrames = frames.filter(f => f.ended_at);
+  const totalAmount    = completedFrames.reduce((sum, f) => sum + parseFloat(f.amount ?? '0'), 0);
 
   async function loadFrames() {
     if (!session) return;
@@ -27,35 +32,45 @@ export function FrameSessionModal({ open, session, onClose }: Props) {
   }
 
   useEffect(() => {
-    if (open && session) { setError(''); setPlayerName(''); loadFrames(); }
+    if (open && session) {
+      setError(''); setPlayerName(''); setEndingFrameId(null);
+      loadFrames();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, session?.id]);
 
-  async function handleStartFrame(e: React.FormEvent) {
-    e.preventDefault();
-    if (!session || !playerName.trim()) return;
+  async function handleStartFrame() {
+    if (!session) return;
     setError(''); setSubmitting(true);
     try {
-      await startFrame(session.id, playerName.trim());
-      setPlayerName('');
+      await startFrame(session.id);
       await loadFrames();
     } catch (err: any) {
       setError(err?.response?.data?.message ?? 'Failed to start frame');
     } finally { setSubmitting(false); }
   }
 
-  async function handleEndFrame(frameId: number) {
+  // Step 1: user clicks "End Frame" → show name input
+  function requestEndFrame(frameId: number) {
+    setEndingFrameId(frameId);
+    setPlayerName('');
+    setError('');
+  }
+
+  // Step 2: user submits name → actually end the frame
+  async function handleConfirmEnd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!endingFrameId || !playerName.trim()) return;
     setError(''); setSubmitting(true);
     try {
-      await endFrame(frameId);
+      await endFrame(endingFrameId, playerName.trim());
+      setEndingFrameId(null);
+      setPlayerName('');
       await loadFrames();
     } catch (err: any) {
       setError(err?.response?.data?.message ?? 'Failed to end frame');
     } finally { setSubmitting(false); }
   }
-
-  const completedFrames = frames.filter(f => f.ended_at);
-  const totalAmount = completedFrames.reduce((sum, f) => sum + parseFloat(f.amount ?? '0'), 0);
 
   function fmt(dt: string) {
     return new Date(dt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -65,17 +80,16 @@ export function FrameSessionModal({ open, session, onClose }: Props) {
     <Modal open={open} onClose={onClose} title={`Frames — ${session?.table_name ?? ''}`}>
       <div className="flex flex-col gap-5">
 
-        {/* Active frame indicator */}
-        {activeFrame && (
+        {/* Active frame running */}
+        {activeFrame && !endingFrameId && (
           <div className="border border-red-700/60 bg-red-950/20 px-4 py-3 flex items-center justify-between">
             <div>
               <p className="font-orbitron text-xs text-red-500 tracking-widest uppercase mb-0.5">● Frame Running</p>
-              <p className="text-white font-semibold text-sm">{activeFrame.player_name}</p>
-              <p className="text-gray-500 text-xs font-mono-game">Since {fmt(activeFrame.started_at)}</p>
+              <p className="text-gray-400 text-xs font-mono-game">Since {fmt(activeFrame.started_at)}</p>
             </div>
             <button
               disabled={submitting}
-              onClick={() => handleEndFrame(activeFrame.id)}
+              onClick={() => requestEndFrame(activeFrame.id)}
               className="px-4 py-2 font-orbitron text-xs font-bold tracking-widest uppercase border
                 bg-red-600/20 border-red-600/50 text-red-400 hover:bg-red-600/40 hover:text-red-200
                 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
@@ -84,27 +98,49 @@ export function FrameSessionModal({ open, session, onClose }: Props) {
           </div>
         )}
 
-        {/* Start new frame */}
-        {!activeFrame && (
-          <form onSubmit={handleStartFrame} className="flex gap-2">
-            <input
-              type="text"
-              value={playerName}
-              onChange={e => setPlayerName(e.target.value)}
-              placeholder="Player name…"
-              maxLength={150}
-              required
-              className="game-input flex-1"
-            />
-            <button
-              type="submit"
-              disabled={submitting || !playerName.trim()}
-              className="px-4 py-2 font-orbitron text-xs font-bold tracking-widest uppercase border
-                bg-emerald-600/20 border-emerald-600/50 text-emerald-400 hover:bg-emerald-600/40
-                disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap">
-              + Start Frame
-            </button>
+        {/* Name input shown when ending a frame */}
+        {endingFrameId && (
+          <form onSubmit={handleConfirmEnd} className="border border-amber-700/50 bg-amber-950/10 px-4 py-3 flex flex-col gap-3">
+            <p className="font-orbitron text-xs text-amber-500 tracking-widest uppercase">Enter player name</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={playerName}
+                onChange={e => setPlayerName(e.target.value)}
+                placeholder="Player name…"
+                maxLength={150}
+                required
+                autoFocus
+                className="game-input flex-1"
+              />
+              <button
+                type="submit"
+                disabled={submitting || !playerName.trim()}
+                className="px-4 py-2 font-orbitron text-xs font-bold tracking-widest uppercase border
+                  bg-emerald-600/20 border-emerald-600/50 text-emerald-400 hover:bg-emerald-600/40
+                  disabled:opacity-40 disabled:cursor-not-allowed transition-colors whitespace-nowrap">
+                ✓ Confirm
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEndingFrameId(null); setPlayerName(''); }}
+                className="px-3 py-2 text-xs border border-gray-700/50 text-gray-500 hover:text-gray-300 transition-colors">
+                Cancel
+              </button>
+            </div>
           </form>
+        )}
+
+        {/* Start new frame button */}
+        {!activeFrame && !endingFrameId && (
+          <button
+            disabled={submitting}
+            onClick={handleStartFrame}
+            className="w-full py-2.5 font-orbitron text-xs font-bold tracking-widest uppercase border
+              bg-emerald-600/20 border-emerald-600/50 text-emerald-400 hover:bg-emerald-600/40 hover:text-emerald-200
+              disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            + Start Frame
+          </button>
         )}
 
         {error && (
@@ -123,7 +159,7 @@ export function FrameSessionModal({ open, session, onClose }: Props) {
             {completedFrames.map((f, i) => (
               <div key={f.id} className={`px-4 py-2.5 flex items-center justify-between ${i < completedFrames.length - 1 ? 'border-b border-purple-900/20' : ''}`}>
                 <div>
-                  <p className="text-gray-200 text-xs font-semibold">{f.player_name}</p>
+                  <p className="text-gray-200 text-xs font-semibold">{f.player_name ?? '—'}</p>
                   <p className="text-gray-600 text-xs font-mono-game">
                     {fmt(f.started_at)} → {f.ended_at ? fmt(f.ended_at) : '—'}
                     {f.duration_min != null && <span className="ml-2 text-purple-700">({Math.ceil(Number(f.duration_min))} min)</span>}

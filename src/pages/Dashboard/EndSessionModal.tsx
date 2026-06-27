@@ -43,24 +43,25 @@ export function EndSessionModal({ open, table, session, onClose, onEnded }: EndS
       .finally(() => setLoadingBill(false));
   }, [open, session]);
 
-  const gross        = bill ? parseFloat(bill.total_amount)   : 0;
-  const sessionAmt   = bill ? parseFloat(bill.session_amount) : 0;
-  const ordersAmt    = bill ? parseFloat(bill.orders_total)   : 0;
+  const gross      = bill ? parseFloat(bill.total_amount)   : 0;
+  const sessionAmt = bill ? parseFloat(bill.session_amount) : 0;
+  const ordersAmt  = bill ? parseFloat(bill.orders_total)   : 0;
 
-  let discountAmount = 0;
-  if (selectedDiscount && gross > 0) {
-    const val   = parseFloat(selectedDiscount.discount_value);
-    const scope = selectedDiscount.scope ?? 'all';
-    // base = what the discount actually applies to
-    const base  = scope === 'session' ? sessionAmt
-                : scope === 'order'   ? ordersAmt
-                : gross;
-    discountAmount = selectedDiscount.discount_type === 'percentage'
-      ? base * val / 100
-      : Math.min(val, base);
+  const discVal   = selectedDiscount ? parseFloat(selectedDiscount.discount_value) : 0;
+  const discScope = selectedDiscount?.scope ?? 'all';
+  const discType  = selectedDiscount?.discount_type;
+
+  function calcDisc(base: number) {
+    if (!selectedDiscount || base <= 0) return 0;
+    return discType === 'percentage' ? Math.round(base * discVal / 100) : Math.min(discVal, base);
   }
-  const rawNet    = gross - discountAmount;
-  const roundedNet = Math.round(rawNet / 5) * 5;
+
+  const tableDiscAmt  = discScope === 'session' || discScope === 'all' ? calcDisc(sessionAmt) : 0;
+  const snacksDiscAmt = discScope === 'order'   || discScope === 'all' ? calcDisc(ordersAmt)  : 0;
+  const tableNet      = sessionAmt - tableDiscAmt;
+  const snacksNet     = ordersAmt  - snacksDiscAmt;
+  const rawNet        = tableNet + snacksNet;
+  const roundedNet    = Math.round(rawNet / 5) * 5;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -160,40 +161,51 @@ export function EndSessionModal({ open, table, session, onClose, onEnded }: EndS
                 <DiscountPicker selected={selectedDiscount} onSelect={setSelectedDiscount} tableType={session?.table_type} />
               </div>
 
-              {/* Final totals */}
+              {/* Itemised totals */}
               <div className="border border-purple-900/30 bg-[#07070f]">
+
+                {/* Table section */}
                 <div className="flex justify-between px-4 py-2.5 border-b border-purple-900/20">
-                  <span className="text-gray-500 text-xs uppercase tracking-wider">Gross Total</span>
-                  <span className="font-mono-game text-gray-400 text-xs">₹{Math.round(gross)}</span>
+                  <span className="text-gray-500 text-xs uppercase tracking-wider">Table time</span>
+                  <span className="font-mono-game text-gray-400 text-xs">₹{Math.round(sessionAmt)}</span>
                 </div>
-                {discountAmount > 0 ? (
-                  <div className="flex justify-between px-4 py-2.5 border-b border-purple-900/20">
+                {tableDiscAmt > 0 && (
+                  <div className="flex justify-between px-4 py-2 border-b border-purple-900/20">
                     <span className="text-emerald-600 text-xs uppercase tracking-wider">
-                      Discount ({selectedDiscount!.discount_type === 'percentage'
-                        ? `${Math.round(parseFloat(selectedDiscount!.discount_value))}%`
-                        : `₹${Math.round(parseFloat(selectedDiscount!.discount_value))} flat`})
+                      Table discount ({discType === 'percentage' ? `${Math.round(discVal)}%` : `₹${Math.round(discVal)} flat`})
                     </span>
-                    <span className="font-mono-game text-emerald-500 text-xs">− ₹{Math.round(discountAmount)}</span>
+                    <span className="font-mono-game text-emerald-500 text-xs">− ₹{Math.round(tableDiscAmt)}</span>
                   </div>
-                ) : (
+                )}
+                <div className="flex justify-between px-4 py-2.5 border-b border-purple-900/30">
+                  <span className="text-gray-400 text-xs uppercase tracking-wider font-semibold">Table subtotal</span>
+                  <span className="font-mono-game text-gray-200 text-xs font-bold">₹{Math.round(tableNet)}</span>
+                </div>
+
+                {/* Snacks section */}
+                {ordersAmt > 0 && (<>
                   <div className="flex justify-between px-4 py-2.5 border-b border-purple-900/20">
-                    <span className="text-gray-700 text-xs uppercase tracking-wider">Discount</span>
-                    <span className="font-mono-game text-gray-700 text-xs">—</span>
+                    <span className="text-gray-500 text-xs uppercase tracking-wider">Snacks / orders</span>
+                    <span className="font-mono-game text-gray-400 text-xs">₹{Math.round(ordersAmt)}</span>
                   </div>
-                )}
-                {rawNet !== roundedNet && (
-                  <div className="flex justify-between px-4 py-2 border-b border-purple-900/10">
-                    <span className="text-gray-600 text-xs uppercase tracking-wider">Exact</span>
-                    <span className="font-mono-game text-gray-600 text-xs">₹{Math.round(rawNet)}</span>
+                  {snacksDiscAmt > 0 && (
+                    <div className="flex justify-between px-4 py-2 border-b border-purple-900/20">
+                      <span className="text-emerald-600 text-xs uppercase tracking-wider">
+                        Snacks discount ({discType === 'percentage' ? `${Math.round(discVal)}%` : `₹${Math.round(discVal)} flat`})
+                      </span>
+                      <span className="font-mono-game text-emerald-500 text-xs">− ₹{Math.round(snacksDiscAmt)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between px-4 py-2.5 border-b border-purple-900/30">
+                    <span className="text-gray-400 text-xs uppercase tracking-wider font-semibold">Snacks subtotal</span>
+                    <span className="font-mono-game text-gray-200 text-xs font-bold">₹{Math.round(snacksNet)}</span>
                   </div>
-                )}
+                </>)}
+
+                {/* Collect */}
                 <div className="flex justify-between px-4 py-3 bg-purple-900/10">
-                  <span className="font-orbitron text-sm text-purple-300 tracking-widest uppercase">
-                    Collect {rawNet !== roundedNet && <span className="text-purple-600 text-xs">(rounded)</span>}
-                  </span>
-                  <span className="font-mono-game font-black text-xl text-cyan-400 text-glow-cyan">
-                    ₹{roundedNet}
-                  </span>
+                  <span className="font-orbitron text-sm text-purple-300 tracking-widest uppercase">Collect</span>
+                  <span className="font-mono-game font-black text-xl text-cyan-400 text-glow-cyan">₹{roundedNet}</span>
                 </div>
               </div>
             </>

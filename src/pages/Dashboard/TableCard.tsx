@@ -230,7 +230,7 @@ export function TableCard({
                   <div className="flex justify-between">
                     <span className="text-gray-500 text-xs tracking-wider uppercase">Table cost</span>
                     <span className={`font-mono-game font-semibold ${isPaused ? 'text-amber-300' : 'text-red-300'}`}>
-                      ₹{parseFloat(session.session_amount ?? '0').toFixed(2)}
+                      ₹{Math.round(parseFloat(session.session_amount ?? '0'))}
                     </span>
                   </div>
 

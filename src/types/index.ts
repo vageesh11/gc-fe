@@ -207,6 +207,7 @@ export interface Bill {
   total_amount: string;
   discount_type: DiscountType;
   discount_value: string;
+  discount_scope: DiscountScope | null;
   discount_amount: string;
   net_amount: string;
   status: BillStatus;

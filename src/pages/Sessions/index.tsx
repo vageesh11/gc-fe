@@ -372,7 +372,7 @@ export function Sessions() {
           <div>
             <label className="game-label">Net Amount</label>
             <p className="font-mono-game font-bold text-cyan-400 text-lg">
-              ₹{paymentTarget?.net_amount ? parseFloat(paymentTarget.net_amount).toFixed(2) : '0.00'}
+              ₹{paymentTarget?.net_amount ? Math.round(parseFloat(paymentTarget.net_amount)) : 0}
             </p>
           </div>
 

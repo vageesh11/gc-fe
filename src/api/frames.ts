@@ -1,13 +1,13 @@
 import client from './client';
 import type { SessionFrame } from '../types';
 
-export async function startFrame(session_id: number, player_name: string): Promise<SessionFrame> {
-  const res = await client.post('/frames/start', { session_id, player_name });
+export async function startFrame(session_id: number): Promise<SessionFrame> {
+  const res = await client.post('/frames/start', { session_id });
   return res.data.data;
 }
 
-export async function endFrame(frameId: number): Promise<SessionFrame> {
-  const res = await client.patch(`/frames/${frameId}/end`);
+export async function endFrame(frameId: number, player_name: string): Promise<SessionFrame> {
+  const res = await client.patch(`/frames/${frameId}/end`, { player_name });
   return res.data.data;
 }
 

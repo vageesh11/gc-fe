@@ -58,11 +58,23 @@ export function Billing() {
     );
   }
 
-  const ordersTotal = parseFloat(bill.orders_total);
-  const sessionAmount = parseFloat(bill.session_amount);
-  const totalAmount = parseFloat(bill.total_amount);
-  const discountAmount = parseFloat(bill.discount_amount);
-  const netAmount = parseFloat(bill.net_amount);
+  const ordersTotal   = parseFloat(bill.orders_total);
+  const sessionAmount  = parseFloat(bill.session_amount);
+  const totalAmount    = parseFloat(bill.total_amount);
+  const netAmount      = parseFloat(bill.net_amount);
+  const discVal        = parseFloat(bill.discount_value || '0');
+  const discScope      = bill.discount_scope ?? 'all';
+  const discType       = bill.discount_type;
+
+  function calcDisc(base: number) {
+    if (!bill.discount_type || bill.discount_type === 'none' || base <= 0) return 0;
+    return discType === 'percentage' ? Math.round(base * discVal / 100) : Math.min(discVal, base);
+  }
+
+  const tableDiscAmt  = discScope === 'session' || discScope === 'all' ? calcDisc(sessionAmount) : 0;
+  const snacksDiscAmt = discScope === 'order'   || discScope === 'all' ? calcDisc(ordersTotal)   : 0;
+  const tableNet      = sessionAmount - tableDiscAmt;
+  const snacksNet     = ordersTotal   - snacksDiscAmt;
   const isActive = bill.status === 'ACTIVE';
   const isPaused = bill.status === 'PAUSED';
   const isLive = isActive || isPaused;
@@ -175,38 +187,51 @@ export function Billing() {
 
         {/* Totals */}
         <div className="px-6 py-4 bg-[#0a0a12] flex flex-col gap-2 text-sm">
-          {bill.booking_type !== 'frame_wise' && (
-            <div className="flex justify-between text-gray-500">
-              <span className="tracking-wider">Table time ({bill.duration_min} min)</span>
-              <span className="font-mono-game">₹{Math.round(sessionAmount)}</span>
-            </div>
-          )}
-          {bill.booking_type === 'frame_wise' && (
-            <div className="flex justify-between text-gray-500">
-              <span className="tracking-wider">Frames total ({bill.frames?.filter(f=>f.ended_at).length ?? 0} frames)</span>
-              <span className="font-mono-game">₹{Math.round(sessionAmount)}</span>
-            </div>
-          )}
-          {ordersTotal > 0 && (
-            <div className="flex justify-between text-gray-500">
-              <span className="tracking-wider">Orders ({bill.orders.length} item{bill.orders.length !== 1 ? 's' : ''})</span>
-              <span className="font-mono-game">₹{Math.round(ordersTotal)}</span>
-            </div>
-          )}
+
+          {/* Table section */}
           <div className="flex justify-between text-gray-500">
-            <span className="tracking-wider">Gross total</span>
-            <span className="font-mono-game">₹{Math.round(totalAmount)}</span>
+            <span className="tracking-wider">
+              {bill.booking_type === 'frame_wise'
+                ? `Frames total (${bill.frames?.filter(f=>f.ended_at).length ?? 0} frames)`
+                : `Table time (${bill.duration_min} min)`}
+            </span>
+            <span className="font-mono-game">₹{Math.round(sessionAmount)}</span>
           </div>
-          {discountAmount > 0 && (
+          {tableDiscAmt > 0 && (
             <div className="flex justify-between text-emerald-700">
               <span className="tracking-wider">
-                Discount ({bill.discount_type?.replace(/_/g, ' ')}
-                {bill.discount_type === 'percentage' ? ` ${Math.round(parseFloat(bill.discount_value))}%` : ''})
+                Table discount ({discType === 'percentage' ? `${Math.round(discVal)}%` : `₹${Math.round(discVal)} flat`})
               </span>
-              <span className="font-mono-game">−₹{Math.round(discountAmount)}</span>
+              <span className="font-mono-game">−₹{Math.round(tableDiscAmt)}</span>
             </div>
           )}
-          <div className="border-t border-purple-900/40 pt-3 mt-1 flex justify-between items-baseline">
+          <div className="flex justify-between text-gray-400 font-semibold border-b border-purple-900/20 pb-2">
+            <span className="tracking-wider">Table subtotal</span>
+            <span className="font-mono-game">₹{Math.round(tableNet)}</span>
+          </div>
+
+          {/* Snacks section */}
+          {ordersTotal > 0 && (<>
+            <div className="flex justify-between text-gray-500 pt-1">
+              <span className="tracking-wider">Snacks / orders ({bill.orders.length} item{bill.orders.length !== 1 ? 's' : ''})</span>
+              <span className="font-mono-game">₹{Math.round(ordersTotal)}</span>
+            </div>
+            {snacksDiscAmt > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span className="tracking-wider">
+                  Snacks discount ({discType === 'percentage' ? `${Math.round(discVal)}%` : `₹${Math.round(discVal)} flat`})
+                </span>
+                <span className="font-mono-game">−₹{Math.round(snacksDiscAmt)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-gray-400 font-semibold border-b border-purple-900/20 pb-2">
+              <span className="tracking-wider">Snacks subtotal</span>
+              <span className="font-mono-game">₹{Math.round(snacksNet)}</span>
+            </div>
+          </>)}
+
+          {/* Net total */}
+          <div className="pt-2 flex justify-between items-baseline">
             <span className="font-orbitron text-sm text-purple-300 tracking-widest">
               NET TOTAL {isLive ? <span className="text-xs text-gray-600">(est.)</span> : ''}
             </span>
