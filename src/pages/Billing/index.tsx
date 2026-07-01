@@ -60,7 +60,8 @@ export function Billing() {
 
   const ordersTotal   = parseFloat(bill.orders_total);
   const sessionAmount  = parseFloat(bill.session_amount);
-  const totalAmount    = parseFloat(bill.total_amount);
+  const _totalAmount   = parseFloat(bill.total_amount);
+  void _totalAmount;
   const netAmount      = parseFloat(bill.net_amount);
   const discVal        = parseFloat(bill.discount_value || '0');
   const discScope      = bill.discount_scope ?? 'all';

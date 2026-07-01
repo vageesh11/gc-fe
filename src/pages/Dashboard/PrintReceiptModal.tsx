@@ -25,7 +25,7 @@ export function PrintReceiptModal({ open, bill, cashAmount, onlineAmount, onClos
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const sessionAmt  = parseFloat(bill.session_amount);
-  const ordersTotal = parseFloat(bill.orders_total);
+  const _ordersTotal = parseFloat(bill.orders_total); void _ordersTotal;
   const grossTotal  = parseFloat(bill.total_amount);
   const discountAmt = parseFloat(bill.discount_amount);
   const netAmount   = Math.round(parseFloat(bill.net_amount) / 5) * 5;

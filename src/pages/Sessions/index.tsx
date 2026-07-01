@@ -154,7 +154,6 @@ export function Sessions() {
   const isLive = (s: Session) => s.status === 'active' || s.status === 'paused';
 
   function openPaymentEdit(s: Session) {
-    const cash = parseFloat(s.net_amount ?? '0');
     const pm = s.payment_method;
     const mode: PaymentMode = pm === 'online' ? 'online' : pm === 'split' ? 'split' : 'cash';
     setPaymentTarget(s);

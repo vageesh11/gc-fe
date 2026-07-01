@@ -81,7 +81,7 @@ function fmtCountdown(secs: number): string {
 
 export function TableCard({
   table, onStartSession, onEndSession, onPauseSession, onResumeSession,
-  onConfirmBooking, onCancelBooking, onAddOrder, onManageFrames, onViewBill, refreshSignal,
+  onConfirmBooking, onCancelBooking, onAddOrder, onManageFrames, onViewBill: _onViewBill, refreshSignal,
 }: TableCardProps) {
   const [session, setSession] = useState<ActiveTableSession | null>(null);
   const [loadingSession, setLoadingSession] = useState(false);
@@ -95,7 +95,7 @@ export function TableCard({
   const isFixedSlot   = session?.booking_type === 'fixed_slot';
   const remainingSecs = useFixedSlotCountdown(session, isPaused);
   const isExpiring    = remainingSecs !== null && remainingSecs <= 300 && remainingSecs > 0; // last 5 min
-  const isOvertime    = remainingSecs !== null && remainingSecs === 0;
+  const _isOvertime   = remainingSecs !== null && remainingSecs === 0; void _isOvertime;
 
   const fetchSession = useCallback(async () => {
     if (table.status === 'AVAILABLE') { setSession(null); return; }

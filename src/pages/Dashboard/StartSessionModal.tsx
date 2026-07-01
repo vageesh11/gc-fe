@@ -21,17 +21,21 @@ export function StartSessionModal({ open, table, onClose, onStarted }: StartSess
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Customer search dropdown
-  const [suggestions, setSuggestions] = useState<Customer[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  // Customer search dropdowns — separate state per field
+  const [nameSuggestions, setNameSuggestions]   = useState<Customer[]>([]);
+  const [phoneSuggestions, setPhoneSuggestions] = useState<Customer[]>([]);
+  const [showNameDrop, setShowNameDrop]   = useState(false);
+  const [showPhoneDrop, setShowPhoneDrop] = useState(false);
   const [searching, setSearching] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const nameRef = useRef<HTMLDivElement>(null);
+  const nameRef  = useRef<HTMLDivElement>(null);
+  const phoneRef = useRef<HTMLDivElement>(null);
 
-  // Close suggestions on outside click
+  // Close respective dropdown on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (nameRef.current && !nameRef.current.contains(e.target as Node)) setShowSuggestions(false);
+      if (nameRef.current  && !nameRef.current.contains(e.target as Node))  setShowNameDrop(false);
+      if (phoneRef.current && !phoneRef.current.contains(e.target as Node)) setShowPhoneDrop(false);
     }
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -42,33 +46,46 @@ export function StartSessionModal({ open, table, onClose, onStarted }: StartSess
     setCustomerName(''); setCustomerPhone('');
     setBookingType('pay_as_you_go');
     setScheduledDateTime(null); setBookedDuration('');
-    setSuggestions([]); setShowSuggestions(false);
+    setNameSuggestions([]); setPhoneSuggestions([]);
+    setShowNameDrop(false); setShowPhoneDrop(false);
     setError('');
   }, [open]);
 
-  function handleNameChange(val: string) {
-    setCustomerName(val);
+  function searchFor(val: string, setResults: (r: Customer[]) => void, setShow: (v: boolean) => void) {
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (val.trim().length < 2) { setSuggestions([]); setShowSuggestions(false); return; }
+    if (val.trim().length < 2) { setResults([]); setShow(false); return; }
     setSearching(true);
     searchTimer.current = setTimeout(async () => {
       try {
         const res = await getCustomers({ search: val.trim(), limit: 6 });
-        setSuggestions(res.data);
-        setShowSuggestions(res.data.length > 0);
+        setResults(res.data);
+        setShow(res.data.length > 0);
       } catch {
-        setSuggestions([]);
+        setResults([]);
       } finally {
         setSearching(false);
       }
     }, 300);
   }
 
+  function handleNameChange(val: string) {
+    setCustomerName(val);
+    setShowPhoneDrop(false); // close phone dropdown when typing in name
+    searchFor(val, setNameSuggestions, setShowNameDrop);
+  }
+
+  function handlePhoneChange(val: string) {
+    const digits = val.replace(/\D/g, '').slice(0, 10);
+    setCustomerPhone(digits);
+    setShowNameDrop(false); // close name dropdown when typing in phone
+    searchFor(digits, setPhoneSuggestions, setShowPhoneDrop);
+  }
+
   function pickCustomer(c: Customer) {
     setCustomerName(c.name);
     setCustomerPhone(c.phone);
-    setSuggestions([]);
-    setShowSuggestions(false);
+    setNameSuggestions([]); setPhoneSuggestions([]);
+    setShowNameDrop(false); setShowPhoneDrop(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -117,7 +134,7 @@ export function StartSessionModal({ open, table, onClose, onStarted }: StartSess
                 type="text"
                 value={customerName}
                 onChange={(e) => handleNameChange(e.target.value)}
-                onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true); }}
+                onFocus={() => { if (nameSuggestions.length > 0) setShowNameDrop(true); }}
                 maxLength={150}
                 placeholder="e.g. Rahul Kumar (optional)"
                 className="game-input"
@@ -127,16 +144,12 @@ export function StartSessionModal({ open, table, onClose, onStarted }: StartSess
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 text-xs font-mono-game">…</span>
               )}
 
-              {showSuggestions && suggestions.length > 0 && (
+              {showNameDrop && nameSuggestions.length > 0 && (
                 <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#0f0f1e] border border-purple-700/50 shadow-2xl max-h-48 overflow-y-auto">
                   <div className="h-[1px] bg-gradient-to-r from-purple-600 to-cyan-500" />
-                  {suggestions.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => pickCustomer(c)}
-                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-purple-900/20 transition-colors border-b border-purple-900/10 last:border-0 text-left"
-                    >
+                  {nameSuggestions.map((c) => (
+                    <button key={c.id} type="button" onClick={() => pickCustomer(c)}
+                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-purple-900/20 transition-colors border-b border-purple-900/10 last:border-0 text-left">
                       <span className="text-gray-200 text-xs font-semibold">{c.name}</span>
                       <span className="text-gray-600 font-mono-game text-xs ml-3">{c.phone}</span>
                     </button>
@@ -149,9 +162,34 @@ export function StartSessionModal({ open, table, onClose, onStarted }: StartSess
 
           <div>
             <label className="game-label">Phone (10 digits)</label>
-            <input type="text" value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-              pattern="[6-9][0-9]{9}" placeholder="9876543210 (optional)" className="game-input" />
+            <div ref={phoneRef} className="relative">
+              <input
+                type="text"
+                value={customerPhone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                onFocus={() => { if (phoneSuggestions.length > 0) setShowPhoneDrop(true); }}
+                pattern="[6-9][0-9]{9}"
+                placeholder="9876543210 (optional)"
+                className="game-input"
+                autoComplete="off"
+              />
+              {searching && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 text-xs font-mono-game">…</span>
+              )}
+
+              {showPhoneDrop && phoneSuggestions.length > 0 && (
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-[#0f0f1e] border border-purple-700/50 shadow-2xl max-h-48 overflow-y-auto">
+                  <div className="h-[1px] bg-gradient-to-r from-purple-600 to-cyan-500" />
+                  {phoneSuggestions.map((c) => (
+                    <button key={c.id} type="button" onClick={() => pickCustomer(c)}
+                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-purple-900/20 transition-colors border-b border-purple-900/10 last:border-0 text-left">
+                      <span className="text-gray-600 font-mono-game text-xs">{c.phone}</span>
+                      <span className="text-gray-200 text-xs font-semibold ml-3">{c.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
