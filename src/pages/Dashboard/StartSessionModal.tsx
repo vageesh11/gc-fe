@@ -10,9 +10,11 @@ interface StartSessionModalProps {
   table: GamingTable | null;
   onClose: () => void;
   onStarted: () => void;
+  /** If set, the table has an upcoming reservation at this time. New session must end by then. */
+  reservedUntil?: Date | null;
 }
 
-export function StartSessionModal({ open, table, onClose, onStarted }: StartSessionModalProps) {
+export function StartSessionModal({ open, table, onClose, onStarted, reservedUntil }: StartSessionModalProps) {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [bookingType, setBookingType] = useState<BookingType>('pay_as_you_go');
@@ -40,6 +42,11 @@ export function StartSessionModal({ open, table, onClose, onStarted }: StartSess
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Minutes remaining until the reservation time (null if no reservation constraint)
+  const maxDurationMins = reservedUntil
+    ? Math.max(0, Math.floor((reservedUntil.getTime() - Date.now()) / 60000))
+    : null;
 
   useEffect(() => {
     if (!open) return;
@@ -103,7 +110,14 @@ export function StartSessionModal({ open, table, onClose, onStarted }: StartSess
         payload.scheduled_start = scheduledDateTime.toISOString();
       }
       if ((bookingType === 'fixed_slot' || bookingType === 'pre_booking') && bookedDuration) {
-        payload.booked_duration = parseInt(bookedDuration, 10);
+        const dur = parseInt(bookedDuration, 10);
+        // Enforce the reservation cap: session must end before the reserved slot
+        if (maxDurationMins !== null && dur > maxDurationMins) {
+          setError(`Session duration cannot exceed ${maxDurationMins} min — table is reserved at ${reservedUntil!.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`);
+          setSubmitting(false);
+          return;
+        }
+        payload.booked_duration = dur;
       }
       await startSession(payload);
       onStarted();
@@ -121,6 +135,21 @@ export function StartSessionModal({ open, table, onClose, onStarted }: StartSess
   return (
     <Modal open={open} onClose={onClose} title={`${isPreBooking ? 'Pre-Book' : 'Start Session'} — ${table?.name ?? ''}`}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+
+        {/* Reservation constraint warning */}
+        {reservedUntil && maxDurationMins !== null && (
+          <div className="border border-amber-700/50 bg-amber-950/20 px-3 py-2.5 flex items-start gap-2">
+            <span className="text-amber-400 mt-0.5">⚠</span>
+            <div>
+              <p className="text-amber-400 text-xs font-mono-game tracking-wide font-bold">
+                TABLE RESERVED AT {reservedUntil.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+              </p>
+              <p className="text-amber-600 text-xs font-mono-game mt-0.5">
+                New session must end by then — max {maxDurationMins} min available
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Customer */}
         <div className="border border-purple-900/30 p-4 flex flex-col gap-4">
@@ -247,27 +276,47 @@ export function StartSessionModal({ open, table, onClose, onStarted }: StartSess
         {needsDuration && (
           <div className="flex flex-col gap-2">
             <label className="game-label">Booked Duration</label>
-            <div className="flex gap-2">
-              {[60, 120, 180].map((mins) => (
-                <button key={mins} type="button"
-                  onClick={() => setBookedDuration(String(mins))}
-                  className={`flex-1 py-2 text-xs font-bold tracking-widest uppercase border transition-all ${
-                    bookedDuration === String(mins)
-                      ? 'bg-purple-600/30 border-purple-500/70 text-purple-200'
-                      : 'border-gray-700/50 text-gray-500 hover:border-purple-700/50 hover:text-purple-400'
-                  }`}>
-                  {mins / 60}hr
-                </button>
-              ))}
-            </div>
-            <input type="number" min="5" step="5" value={bookedDuration}
-              onChange={(e) => setBookedDuration(e.target.value)}
-              required className="game-input" placeholder="or enter custom minutes (e.g. 90, 45)" />
-            {bookedDuration && (
-              <p className="text-purple-700 text-xs font-mono-game tracking-wide">
-                ◷ {Math.floor(parseInt(bookedDuration) / 60) > 0 ? `${Math.floor(parseInt(bookedDuration) / 60)}h ` : ''}{parseInt(bookedDuration) % 60 > 0 ? `${parseInt(bookedDuration) % 60}m` : ''}
+            {maxDurationMins !== null && (
+              <p className="text-amber-600 text-xs font-mono-game tracking-wide">
+                Max allowed: {maxDurationMins} min (reservation at {reservedUntil!.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })})
               </p>
             )}
+            <div className="flex gap-2">
+              {[60, 120, 180].map((mins) => {
+                const exceedsCap = maxDurationMins !== null && mins > maxDurationMins;
+                return (
+                  <button key={mins} type="button"
+                    onClick={() => !exceedsCap && setBookedDuration(String(mins))}
+                    disabled={exceedsCap}
+                    className={`flex-1 py-2 text-xs font-bold tracking-widest uppercase border transition-all ${
+                      exceedsCap
+                        ? 'border-gray-800/30 text-gray-700 cursor-not-allowed opacity-40'
+                        : bookedDuration === String(mins)
+                        ? 'bg-purple-600/30 border-purple-500/70 text-purple-200'
+                        : 'border-gray-700/50 text-gray-500 hover:border-purple-700/50 hover:text-purple-400'
+                    }`}>
+                    {mins / 60}hr
+                  </button>
+                );
+              })}
+            </div>
+            <input type="number" min="5" step="5"
+              max={maxDurationMins ?? undefined}
+              value={bookedDuration}
+              onChange={(e) => setBookedDuration(e.target.value)}
+              required className="game-input" placeholder={maxDurationMins !== null ? `max ${maxDurationMins} min` : 'or enter custom minutes (e.g. 90, 45)'} />
+            {bookedDuration && (() => {
+              const dur = parseInt(bookedDuration);
+              const overCap = maxDurationMins !== null && dur > maxDurationMins;
+              return (
+                <p className={`text-xs font-mono-game tracking-wide ${overCap ? 'text-red-500' : 'text-purple-700'}`}>
+                  {overCap
+                    ? `⚠ Exceeds max allowed (${maxDurationMins} min)`
+                    : `◷ ${Math.floor(dur / 60) > 0 ? `${Math.floor(dur / 60)}h ` : ''}${dur % 60 > 0 ? `${dur % 60}m` : ''}`
+                  }
+                </p>
+              );
+            })()}
           </div>
         )}
 

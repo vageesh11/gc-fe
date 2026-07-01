@@ -15,7 +15,7 @@ const TYPE_ACCENT: Record<string, { border: string; text: string; bg: string }> 
 
 interface TableCardProps {
   table: GamingTable;
-  onStartSession: (table: GamingTable) => void;
+  onStartSession: (table: GamingTable, reservedUntil?: Date) => void;
   onEndSession: (table: GamingTable, session: ActiveTableSession) => void;
   onPauseSession: (table: GamingTable, session: ActiveTableSession) => void;
   onResumeSession: (table: GamingTable, session: ActiveTableSession) => void;
@@ -290,6 +290,15 @@ export function TableCard({
           </button>
         ) : isReserved ? (
           <>
+            {/* Allow booking a new walk-in session that must end before the reservation time */}
+            {session?.scheduled_start && (
+              <button
+                onClick={() => onStartSession(table, new Date(session.scheduled_start!))}
+                className="w-full py-2 px-4 text-xs font-bold tracking-widest uppercase transition-all
+                  bg-purple-600/10 border border-purple-600/40 text-purple-400 hover:bg-purple-600/20 hover:text-purple-200">
+                ▶ Book Until Reservation
+              </button>
+            )}
             <button onClick={() => session && onConfirmBooking(table, session)}
               disabled={!session}
               className="w-full py-2.5 px-4 text-sm font-bold tracking-widest uppercase transition-all duration-200

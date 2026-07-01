@@ -36,7 +36,7 @@ export function Dashboard() {
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [filter, setFilter] = useState<FilterType>('all');
 
-  const [startModal, setStartModal] = useState<GamingTable | null>(null);
+  const [startModal, setStartModal] = useState<{ table: GamingTable; reservedUntil?: Date } | null>(null);
   const [endModal, setEndModal] = useState<{ table: GamingTable; session: ActiveTableSession } | null>(null);
   const [showAddTable, setShowAddTable] = useState(false);
   const [orderModal, setOrderModal] = useState<{ table: GamingTable; session: ActiveTableSession } | null>(null);
@@ -273,7 +273,7 @@ export function Dashboard() {
             <div key={table.id} className="relative group">
               <TableCard
                 table={table}
-                onStartSession={(t) => setStartModal(t)}
+                onStartSession={(t, reservedUntil) => setStartModal({ table: t, reservedUntil })}
                 onEndSession={handleEndSession}
                 onPauseSession={handlePauseSession}
                 onResumeSession={handleResumeSession}
@@ -299,7 +299,8 @@ export function Dashboard() {
 
       <StartSessionModal
         open={!!startModal}
-        table={startModal}
+        table={startModal?.table ?? null}
+        reservedUntil={startModal?.reservedUntil}
         onClose={() => setStartModal(null)}
         onStarted={() => { bump(); setStartModal(null); }}
       />
