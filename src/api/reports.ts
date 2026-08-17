@@ -26,7 +26,7 @@ export async function downloadDailyExcel(date: string): Promise<void> {
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `gaming-cafe-daily-${date}.xlsx`; a.click();
+  a.href = url; a.download = `bengaluru-snooker-club-daily-${date}.xlsx`; a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -55,7 +55,7 @@ export async function downloadWeeklyExcel(weekStart: string): Promise<void> {
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `gaming-cafe-weekly-${weekStart}.xlsx`; a.click();
+  a.href = url; a.download = `bengaluru-snooker-club-weekly-${weekStart}.xlsx`; a.click();
   URL.revokeObjectURL(url);
 }
 
@@ -82,6 +82,6 @@ export async function downloadMonthlyExcel(month: string): Promise<void> {
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `gaming-cafe-monthly-${month}.xlsx`; a.click();
+  a.href = url; a.download = `bengaluru-snooker-club-monthly-${month}.xlsx`; a.click();
   URL.revokeObjectURL(url);
 }

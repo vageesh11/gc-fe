@@ -199,6 +199,8 @@ export interface Bill {
   table_type: TableType;
   price_per_minute: string;
   booking_type: BookingType;
+  booked_duration?: number | null;
+  scheduled_start?: string | null;
   start_time: string;
   end_time?: string;
   duration_min: number;

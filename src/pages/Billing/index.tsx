@@ -68,7 +68,7 @@ export function Billing() {
   const discType       = bill.discount_type;
 
   function calcDisc(base: number) {
-    if (!bill.discount_type || bill.discount_type === 'none' || base <= 0) return 0;
+    if (!discType || discType === 'none' || base <= 0) return 0;
     return discType === 'percentage' ? Math.round(base * discVal / 100) : Math.min(discVal, base);
   }
 
@@ -79,6 +79,44 @@ export function Billing() {
   const isActive = bill.status === 'ACTIVE';
   const isPaused = bill.status === 'PAUSED';
   const isLive = isActive || isPaused;
+
+  // ── Per-booking-type detail rows ─────────────────────────────────────────
+  const isFrameWise = bill.booking_type === 'frame_wise';
+  const isSlotType  = bill.booking_type === 'fixed_slot' || bill.booking_type === 'pre_booking';
+  const endedFrames = (bill.frames ?? []).filter((f) => f.ended_at);
+  const openFrame   = (bill.frames ?? []).find((f) => !f.ended_at);
+  const ratePerHr   = Math.round(parseFloat(bill.price_per_minute) * 60);
+
+  const refEnd     = bill.end_time ?? new Date().toISOString();
+  const elapsedMin = Math.max(0, Math.round((new Date(refEnd).getTime() - new Date(bill.start_time).getTime()) / 60000));
+  const pauseRows  = bill.pauses.map((p) => ({
+    ...p,
+    mins: Math.max(0, Math.round((new Date(p.resumed_at ?? refEnd).getTime() - new Date(p.paused_at).getTime()) / 60000)),
+  }));
+  const totalPausedMin = pauseRows.reduce((s, p) => s + p.mins, 0);
+
+  const detailRows: { label: string; val: string }[] = [
+    { label: 'Session #', val: `#${bill.session_id}` },
+  ];
+  if (isSlotType) {
+    if (bill.scheduled_start) detailRows.push({ label: 'Scheduled start', val: formatDate(bill.scheduled_start) });
+    if (bill.booked_duration) detailRows.push({ label: 'Booked slot', val: `${bill.booked_duration} min` });
+  }
+  detailRows.push(
+    { label: 'Start', val: formatDate(bill.start_time) },
+    { label: 'End',   val: bill.end_time ? formatDate(bill.end_time) : isPaused ? 'Paused' : 'Running…' },
+  );
+  if (isFrameWise) {
+    detailRows.push(
+      { label: 'Frames played', val: `${endedFrames.length}${openFrame ? ' (+1 live)' : ''}` },
+      { label: 'Frame time',    val: `${bill.duration_min} min` },
+    );
+  } else {
+    detailRows.push({ label: 'Elapsed', val: `${elapsedMin} min` });
+    if (totalPausedMin > 0) detailRows.push({ label: 'Paused', val: `${totalPausedMin} min` });
+    detailRows.push({ label: 'Billable time', val: `${bill.duration_min} min` });
+  }
+  detailRows.push({ label: 'Rate', val: `₹${ratePerHr}/hr` });
 
   const statusVariant = isActive ? 'warning' : isPaused ? 'info' : 'success';
   const statusLabel = isActive ? '● Live' : isPaused ? '⏸ Paused' : '✓ Closed';
@@ -119,69 +157,88 @@ export function Billing() {
           </div>
         </div>
 
-        {/* Session meta */}
-        <div className="px-6 py-4 border-b border-purple-900/20 grid grid-cols-2 gap-4 text-sm">
-          {[
-            { label: 'Session #', val: `#${bill.session_id}`, mono: true },
-            { label: 'Duration', val: `${bill.duration_min} min`, mono: true },
-            { label: 'Start', val: formatDate(bill.start_time), mono: false },
-            { label: 'End', val: bill.end_time ? formatDate(bill.end_time) : '—', mono: false },
-          ].map(({ label, val, mono }) => (
-            <div key={label}>
-              <p className="font-orbitron text-purple-800 text-xs tracking-widest mb-0.5">{label}</p>
-              <p className={`text-gray-300 font-semibold ${mono ? 'font-mono-game' : ''}`}>{val}</p>
-            </div>
-          ))}
+        {/* Session details */}
+        <div className="px-6 py-4 border-b border-purple-900/20">
+          <p className="font-orbitron text-xs text-purple-600 tracking-widest mb-3 uppercase">// Session Details</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            {detailRows.map(({ label, val }) => (
+              <div key={label}>
+                <p className="text-gray-600 text-xs tracking-wider uppercase mb-0.5">{label}</p>
+                <p className="text-gray-300 font-semibold font-mono-game text-xs">{val}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Pauses */}
-        {bill.pauses.length > 0 && (
-          <div className="px-6 py-3 border-b border-purple-900/20">
-            <p className="font-orbitron text-xs text-purple-800 tracking-widest mb-2 uppercase">Pause History</p>
-            {bill.pauses.map((p) => (
+        {pauseRows.length > 0 && (
+          <div className="px-6 py-4 border-b border-purple-900/20">
+            <p className="font-orbitron text-xs text-purple-600 tracking-widest mb-3 uppercase">// Pause History</p>
+            {pauseRows.map((p) => (
               <div key={p.id} className="flex justify-between text-xs font-mono-game text-gray-600 py-0.5">
-                <span>⏸ {formatTime(p.paused_at)}</span>
-                <span>{p.resumed_at ? `▶ ${formatTime(p.resumed_at)}` : <span className="text-blue-700">Still paused</span>}</span>
+                <span>⏸ {formatTime(p.paused_at)} → {p.resumed_at ? `▶ ${formatTime(p.resumed_at)}` : <span className="text-blue-700">still paused</span>}</span>
+                <span className="text-gray-700">{p.mins} min</span>
               </div>
             ))}
+            <div className="flex justify-between text-xs font-mono-game text-gray-500 pt-1.5 mt-1.5 border-t border-gray-800/40">
+              <span>Total paused</span>
+              <span>{totalPausedMin} min</span>
+            </div>
           </div>
         )}
 
         {/* Frames (frame_wise sessions) */}
-        {bill.booking_type === 'frame_wise' && bill.frames && bill.frames.filter(f => f.ended_at).length > 0 && (
+        {isFrameWise && (bill.frames ?? []).length > 0 && (
           <div className="px-6 py-4 border-b border-purple-900/20">
             <p className="font-orbitron text-xs text-purple-600 tracking-widest mb-3 uppercase">// Frames</p>
-            <div className="flex flex-col gap-0">
-              {bill.frames.filter(f => f.ended_at).map((f, i) => (
-                <div key={f.id} className={`flex justify-between items-center py-2 ${i < bill.frames!.filter(x=>x.ended_at).length - 1 ? 'border-b border-gray-800/30' : ''}`}>
+            <div className="flex flex-col">
+              {(bill.frames ?? []).map((f, i, arr) => (
+                <div key={f.id} className={`flex justify-between items-center py-2 ${i < arr.length - 1 ? 'border-b border-gray-800/30' : ''}`}>
                   <div>
-                    <span className="text-gray-300 font-semibold text-sm">{f.player_name}</span>
-                    <span className="text-gray-600 ml-2 font-mono-game text-xs">{Math.ceil(Number(f.duration_min))} min</span>
+                    <span className="text-gray-300 font-semibold text-sm">{f.player_name || '—'}</span>
+                    <span className="text-gray-600 ml-2 font-mono-game text-xs">
+                      {formatTime(f.started_at)} – {f.ended_at ? formatTime(f.ended_at) : 'now'}
+                    </span>
                   </div>
-                  <span className="font-mono-game font-bold text-cyan-400">₹{Math.round(parseFloat(f.amount ?? '0'))}</span>
+                  <div className="text-right">
+                    {f.ended_at ? (
+                      <>
+                        <span className="font-mono-game font-bold text-cyan-400">₹{Math.round(parseFloat(f.amount ?? '0'))}</span>
+                        <span className="text-xs text-gray-700 ml-1 font-mono-game">({Math.ceil(Number(f.duration_min))} min)</span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-blue-700 font-mono-game">in progress</span>
+                    )}
+                  </div>
                 </div>
               ))}
+            </div>
+            <div className="flex justify-between text-xs font-mono-game text-gray-500 pt-2 mt-1 border-t border-gray-800/40">
+              <span>{endedFrames.length} frame{endedFrames.length !== 1 ? 's' : ''} · {bill.duration_min} min</span>
+              <span>₹{Math.round(sessionAmount)}</span>
             </div>
           </div>
         )}
 
-        {/* Orders */}
+        {/* Snacks & Orders */}
         {bill.orders.length > 0 && (
           <div className="px-6 py-4 border-b border-purple-900/20">
-            <p className="font-orbitron text-xs text-purple-600 tracking-widest mb-3 uppercase">Orders</p>
-            <div className="flex flex-col gap-2">
+            <p className="font-orbitron text-xs text-purple-600 tracking-widest mb-3 uppercase">// Snacks & Orders</p>
+            <div className="flex flex-col">
               {bill.orders.map((order) => (
                 <div key={order.id} className="flex justify-between items-center text-sm py-1.5 border-b border-gray-800/40 last:border-0">
                   <div>
                     <span className="text-gray-300 font-semibold">{order.item_name}</span>
-                    <span className="text-gray-600 ml-2 font-mono-game text-xs">× {order.quantity}</span>
+                    <span className="text-gray-600 ml-2 font-mono-game text-xs">× {order.quantity} @ ₹{Math.round(parseFloat(order.unit_price))}</span>
+                    <span className="text-gray-700 ml-2 font-mono-game text-xs">{formatTime(order.created_at)}</span>
                   </div>
-                  <div className="text-right">
-                    <span className="font-mono-game font-bold text-cyan-400">₹{Math.round(parseFloat(order.subtotal))}</span>
-                    <span className="text-xs text-gray-700 ml-1 font-mono-game">(₹{Math.round(parseFloat(order.unit_price))} ea)</span>
-                  </div>
+                  <span className="font-mono-game font-bold text-cyan-400">₹{Math.round(parseFloat(order.subtotal))}</span>
                 </div>
               ))}
+            </div>
+            <div className="flex justify-between text-xs font-mono-game text-gray-500 pt-2 mt-1 border-t border-gray-800/40">
+              <span>{bill.orders.length} item{bill.orders.length !== 1 ? 's' : ''}</span>
+              <span>₹{Math.round(ordersTotal)}</span>
             </div>
           </div>
         )}
@@ -193,7 +250,7 @@ export function Billing() {
           <div className="flex justify-between text-gray-500">
             <span className="tracking-wider">
               {bill.booking_type === 'frame_wise'
-                ? `Frames total (${bill.frames?.filter(f=>f.ended_at).length ?? 0} frames)`
+                ? `Frames total (${endedFrames.length} frames)`
                 : `Table time (${bill.duration_min} min)`}
             </span>
             <span className="font-mono-game">₹{Math.round(sessionAmount)}</span>

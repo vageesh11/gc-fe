@@ -21,21 +21,67 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
+const BOOKING_LABELS: Record<string, string> = {
+  pay_as_you_go: 'PAY AS YOU GO',
+  fixed_slot: 'FIXED SLOT',
+  pre_booking: 'PRE BOOKING',
+  frame_wise: 'FRAME WISE',
+};
+
+// Shared inline-style shorthands (58mm receipt, inline styles survive innerHTML copy)
+const row: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', marginBottom: '2px' };
+const lbl: React.CSSProperties = { flex: 1 };
+const val: React.CSSProperties = { textAlign: 'right', whiteSpace: 'nowrap', marginLeft: '4px' };
+const divider: React.CSSProperties = { borderTop: '1px dashed #000', margin: '5px 0' };
+const solid: React.CSSProperties = { borderTop: '1px solid #000', margin: '5px 0' };
+const sectionHead: React.CSSProperties = { fontWeight: 'bold', fontSize: '10px', marginBottom: '2px' };
+const sub: React.CSSProperties = { fontSize: '9px', color: '#333', paddingLeft: '4px' };
+
 export function PrintReceiptModal({ open, bill, cashAmount, onlineAmount, onClose }: PrintReceiptModalProps) {
   const receiptRef = useRef<HTMLDivElement>(null);
 
   const sessionAmt  = parseFloat(bill.session_amount);
-  const _ordersTotal = parseFloat(bill.orders_total); void _ordersTotal;
+  const ordersTotal = parseFloat(bill.orders_total);
   const grossTotal  = parseFloat(bill.total_amount);
   const discountAmt = parseFloat(bill.discount_amount);
   const netAmount   = Math.round(parseFloat(bill.net_amount) / 5) * 5;
   const pricePerHr  = (parseFloat(bill.price_per_minute) * 60).toFixed(0);
+
+  const isFrameWise = bill.booking_type === 'frame_wise';
+  const isSlotType  = bill.booking_type === 'fixed_slot' || bill.booking_type === 'pre_booking';
+  const endedFrames = (bill.frames ?? []).filter((f) => f.ended_at);
+
+  // Total paused minutes (open pause counts until session end)
+  const refEnd = bill.end_time ?? new Date().toISOString();
+  const totalPausedMin = bill.pauses.reduce((sum, p) => {
+    const to = p.resumed_at ?? refEnd;
+    return sum + Math.max(0, Math.round((new Date(to).getTime() - new Date(p.paused_at).getTime()) / 60000));
+  }, 0);
 
   const paymentLine = cashAmount > 0 && onlineAmount > 0
     ? `Cash ₹${cashAmount} + Online ₹${onlineAmount}`
     : cashAmount > 0
     ? `Cash ₹${cashAmount}`
     : `Online ₹${onlineAmount}`;
+
+  // ── Discount breakdown per section ──────────────────────────────────────
+  const discVal   = parseFloat(bill.discount_value || '0');
+  const discScope = bill.discount_scope ?? 'all';
+  const discType  = bill.discount_type;
+  const isPctDisc = discType === 'percentage';
+
+  function calcDisc(base: number) {
+    if (!discType || discType === 'none' || base <= 0) return 0;
+    return isPctDisc ? Math.round(base * discVal / 100) : Math.min(discVal, base);
+  }
+
+  // Section-level discounts. Flat/pass with scope 'all' can't be attributed to
+  // one section, so it stays a single bill-level line in the totals area.
+  const tableDiscAmt  = discountAmt > 0 && (discScope === 'session' || (discScope === 'all' && isPctDisc)) ? calcDisc(sessionAmt)  : 0;
+  const snacksDiscAmt = discountAmt > 0 && (discScope === 'order'   || (discScope === 'all' && isPctDisc)) ? calcDisc(ordersTotal) : 0;
+  const billLevelDisc = discountAmt > 0 && !isPctDisc && discScope === 'all';
+
+  const discShort = isPctDisc ? `${discVal.toFixed(0)}%` : discType === 'flat' ? 'flat' : discType === 'pass' ? 'pass' : '';
 
   function handlePrint() {
     const receiptHtml = receiptRef.current?.innerHTML ?? '';
@@ -55,24 +101,12 @@ export function PrintReceiptModal({ open, bill, cashAmount, onlineAmount, onClos
   body {
     font-family: 'Courier New', Courier, monospace;
     font-size: 11px;
+    font-weight: bold;
     width: 58mm;
     padding: 4mm 3mm;
     color: #000;
     background: #fff;
   }
-  .center  { text-align: center; }
-  .right   { text-align: right; }
-  .bold    { font-weight: bold; }
-  .lg      { font-size: 14px; font-weight: bold; }
-  .xl      { font-size: 17px; font-weight: bold; }
-  .divider { border-top: 1px dashed #000; margin: 3mm 0; }
-  .solid   { border-top: 1px solid #000; margin: 3mm 0; }
-  .row     { display: flex; justify-content: space-between; margin-bottom: 1.5mm; }
-  .row .label { flex: 1; }
-  .row .val   { text-align: right; white-space: nowrap; margin-left: 2mm; }
-  .indent  { padding-left: 3mm; }
-  .small   { font-size: 9px; color: #444; }
-  .total-row { font-size: 13px; font-weight: bold; }
 </style>
 </head>
 <body>
@@ -90,97 +124,170 @@ ${receiptHtml}
         {/* Receipt preview — styled to mimic 58mm paper */}
         <div
           ref={receiptRef}
-          style={{ fontFamily: "'Courier New', monospace", fontSize: '11px', width: '210px',
+          style={{ fontFamily: "'Courier New', monospace", fontSize: '11px', fontWeight: 'bold', width: '210px',
             background: '#fff', color: '#000', padding: '8px 6px', margin: '0 auto',
             border: '1px dashed #555' }}
         >
           {/* Header */}
-          <div className="center bold lg" style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>
-            GAMING CAFÉ
+          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px' }}>
+            BENGALURU SNOOKER CLUB
           </div>
-          <div style={{ textAlign: 'center', fontSize: '9px', marginBottom: '4px' }}>
+          <div style={{ textAlign: 'center', fontSize: '9px', marginBottom: '2px' }}>
             {bill.table_name} · {bill.table_type.toUpperCase()}
           </div>
-          <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }} />
+          <div style={{ textAlign: 'center', fontSize: '9px', marginBottom: '4px' }}>
+            {BOOKING_LABELS[bill.booking_type] ?? bill.booking_type}
+          </div>
+          <div style={divider} />
 
           {/* Session info */}
-          <div style={{ fontSize: '10px', marginBottom: '2px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Receipt #</span><span>{bill.session_id}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Date</span><span>{fmt(bill.start_time)}</span>
-            </div>
+          <div style={{ fontSize: '10px' }}>
+            <div style={row}><span style={lbl}>Receipt #</span><span style={val}>{bill.session_id}</span></div>
+            <div style={row}><span style={lbl}>Date</span><span style={val}>{fmt(bill.start_time)}</span></div>
             {bill.customer_name && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Customer</span><span>{bill.customer_name}</span>
-              </div>
+              <div style={row}><span style={lbl}>Customer</span><span style={val}>{bill.customer_name}</span></div>
             )}
             {bill.customer_phone && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Mobile</span><span>{bill.customer_phone}</span>
-              </div>
+              <div style={row}><span style={lbl}>Mobile</span><span style={val}>{bill.customer_phone}</span></div>
             )}
           </div>
-          <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }} />
+          <div style={divider} />
 
-          {/* Session time */}
-          <div style={{ fontSize: '10px', marginBottom: '2px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Start</span><span>{fmtTime(bill.start_time)}</span>
-            </div>
+          {/* Session time details */}
+          <div style={{ fontSize: '10px' }}>
+            {isSlotType && bill.scheduled_start && (
+              <div style={row}><span style={lbl}>Scheduled</span><span style={val}>{fmtTime(bill.scheduled_start)}</span></div>
+            )}
+            {isSlotType && bill.booked_duration != null && (
+              <div style={row}><span style={lbl}>Slot booked</span><span style={val}>{bill.booked_duration} min</span></div>
+            )}
+            <div style={row}><span style={lbl}>Start</span><span style={val}>{fmtTime(bill.start_time)}</span></div>
             {bill.end_time && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>End</span><span>{fmtTime(bill.end_time)}</span>
-              </div>
+              <div style={row}><span style={lbl}>End</span><span style={val}>{fmtTime(bill.end_time)}</span></div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Duration</span><span>{bill.duration_min} min</span>
-            </div>
-            {bill.pauses.length > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Pauses</span><span>{bill.pauses.length}x</span>
-              </div>
+            {totalPausedMin > 0 && (
+              <div style={row}><span style={lbl}>Paused ({bill.pauses.length}x)</span><span style={val}>{totalPausedMin} min</span></div>
+            )}
+            {isFrameWise ? (
+              <div style={row}><span style={lbl}>Frames played</span><span style={val}>{endedFrames.length} · {bill.duration_min} min</span></div>
+            ) : (
+              <>
+                <div style={row}><span style={lbl}>Billable time</span><span style={val}>{bill.duration_min} min</span></div>
+                <div style={row}><span style={lbl}>Rate</span><span style={val}>₹{pricePerHr}/hr</span></div>
+              </>
             )}
           </div>
-          <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }} />
+          <div style={divider} />
 
-          {/* Table time line */}
-          <div style={{ fontSize: '10px', marginBottom: '2px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Table ({bill.duration_min}min @₹{pricePerHr}/hr)</span>
-              <span>₹{sessionAmt.toFixed(2)}</span>
-            </div>
-
-            {/* Orders */}
-            {bill.orders.length > 0 && bill.orders.map((o) => (
-              <div key={o.id} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ paddingLeft: '2px' }}>{o.item_name} x{o.quantity}</span>
-                <span>₹{parseFloat(o.subtotal).toFixed(2)}</span>
-              </div>
-            ))}
+          {/* Charges — table time OR frames */}
+          <div style={{ fontSize: '10px' }}>
+            {isFrameWise ? (
+              <>
+                <div style={sectionHead}>FRAMES ({endedFrames.length})</div>
+                {endedFrames.map((f) => (
+                  <div key={f.id} style={{ marginBottom: '2px' }}>
+                    <div style={row}>
+                      <span style={lbl}>{f.player_name || 'Player'}</span>
+                      <span style={val}>₹{parseFloat(f.amount ?? '0').toFixed(2)}</span>
+                    </div>
+                    <div style={sub}>
+                      {fmtTime(f.started_at)} - {fmtTime(f.ended_at!)} · {Math.ceil(Number(f.duration_min))} min
+                    </div>
+                  </div>
+                ))}
+                <div style={{ ...row, fontWeight: 'bold', borderTop: '1px dotted #000', paddingTop: '2px', marginTop: '2px' }}>
+                  <span style={lbl}>Frames Total</span>
+                  <span style={val}>₹{sessionAmt.toFixed(2)}</span>
+                </div>
+                {tableDiscAmt > 0 && (
+                  <>
+                    <div style={row}>
+                      <span style={lbl}>Discount {discShort}</span>
+                      <span style={val}>-₹{tableDiscAmt.toFixed(2)}</span>
+                    </div>
+                    <div style={{ ...row, fontWeight: 'bold' }}>
+                      <span style={lbl}>Frames Subtotal</span>
+                      <span style={val}>₹{(sessionAmt - tableDiscAmt).toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <div style={sectionHead}>TABLE TIME</div>
+                <div style={row}>
+                  <span style={lbl}>{bill.duration_min} min @ ₹{pricePerHr}/hr</span>
+                  <span style={val}>₹{sessionAmt.toFixed(2)}</span>
+                </div>
+                {tableDiscAmt > 0 && (
+                  <>
+                    <div style={row}>
+                      <span style={lbl}>Discount {discShort}</span>
+                      <span style={val}>-₹{tableDiscAmt.toFixed(2)}</span>
+                    </div>
+                    <div style={{ ...row, fontWeight: 'bold' }}>
+                      <span style={lbl}>Table Subtotal</span>
+                      <span style={val}>₹{(sessionAmt - tableDiscAmt).toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
-          <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }} />
+
+          {/* Snacks & orders */}
+          {bill.orders.length > 0 && (
+            <>
+              <div style={divider} />
+              <div style={{ fontSize: '10px' }}>
+                <div style={sectionHead}>SNACKS & ORDERS</div>
+                {bill.orders.map((o) => (
+                  <div key={o.id} style={{ marginBottom: '2px' }}>
+                    <div style={row}>
+                      <span style={lbl}>{o.item_name} x{o.quantity}</span>
+                      <span style={val}>₹{parseFloat(o.subtotal).toFixed(2)}</span>
+                    </div>
+                    <div style={sub}>@ ₹{parseFloat(o.unit_price).toFixed(0)} each · {fmtTime(o.created_at)}</div>
+                  </div>
+                ))}
+                <div style={{ ...row, fontWeight: 'bold', borderTop: '1px dotted #000', paddingTop: '2px', marginTop: '2px' }}>
+                  <span style={lbl}>Snacks Total</span>
+                  <span style={val}>₹{ordersTotal.toFixed(2)}</span>
+                </div>
+                {snacksDiscAmt > 0 && (
+                  <>
+                    <div style={row}>
+                      <span style={lbl}>Discount {discShort}</span>
+                      <span style={val}>-₹{snacksDiscAmt.toFixed(2)}</span>
+                    </div>
+                    <div style={{ ...row, fontWeight: 'bold' }}>
+                      <span style={lbl}>Snacks Subtotal</span>
+                      <span style={val}>₹{(ordersTotal - snacksDiscAmt).toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+          <div style={divider} />
 
           {/* Totals */}
-          <div style={{ fontSize: '10px', marginBottom: '2px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Gross Total</span><span>₹{grossTotal.toFixed(2)}</span>
-            </div>
-            {discountAmt > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Discount
-                  {bill.discount_type === 'percentage'
-                    ? ` (${parseFloat(bill.discount_value).toFixed(0)}%)`
-                    : bill.discount_type === 'flat'
-                    ? ' (flat)'
-                    : ''}
-                </span>
-                <span>-₹{discountAmt.toFixed(2)}</span>
+          <div style={{ fontSize: '10px' }}>
+            <div style={row}><span style={lbl}>Gross Total</span><span style={val}>₹{grossTotal.toFixed(2)}</span></div>
+            {billLevelDisc && (
+              <div style={row}>
+                <span style={lbl}>Discount {discShort} (whole bill)</span>
+                <span style={val}>-₹{discountAmt.toFixed(2)}</span>
+              </div>
+            )}
+            {discountAmt > 0 && !billLevelDisc && (
+              <div style={row}>
+                <span style={lbl}>Total Discount</span>
+                <span style={val}>-₹{discountAmt.toFixed(2)}</span>
               </div>
             )}
           </div>
-          <div style={{ borderTop: '1px solid #000', margin: '4px 0' }} />
+          <div style={solid} />
 
           {/* Net total — large */}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '16px', marginBottom: '4px' }}>
@@ -188,12 +295,10 @@ ${receiptHtml}
           </div>
 
           {/* Payment */}
-          <div style={{ fontSize: '10px', marginBottom: '2px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Payment</span><span>{paymentLine}</span>
-            </div>
+          <div style={{ fontSize: '10px' }}>
+            <div style={row}><span style={lbl}>Payment</span><span style={val}>{paymentLine}</span></div>
           </div>
-          <div style={{ borderTop: '1px dashed #000', margin: '4px 0' }} />
+          <div style={divider} />
 
           {/* Footer */}
           <div style={{ textAlign: 'center', fontSize: '9px', marginTop: '4px' }}>

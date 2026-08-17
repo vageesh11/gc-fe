@@ -289,8 +289,9 @@ export function Login() {
             </svg>
           </div>
 
-          <h1 className="font-orbitron font-black text-2xl text-white tracking-widest text-glow-purple">
-            GAME<span className="text-purple-400">CAFÉ</span>
+          <h1 className="font-orbitron font-black text-2xl text-white tracking-widest text-glow-purple leading-tight">
+            BENGALURU<br />
+            <span className="text-purple-400">SNOOKER CLUB</span>
           </h1>
           <p className="text-xs text-purple-800 tracking-widest font-mono-game mt-1">MANAGEMENT SYSTEM</p>
         </div>

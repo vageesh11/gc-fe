@@ -193,7 +193,7 @@ export function Layout() {
                 <span className="text-lg">🎱</span>
               </div>
               <span className="font-orbitron font-bold text-white text-sm tracking-widest text-glow-purple">
-                GAME<span className="text-purple-400">CAFÉ</span>
+                BENGALURU <span className="text-purple-400">SNOOKER CLUB</span>
               </span>
             </div>
 
@@ -246,7 +246,7 @@ export function Layout() {
 
         <footer className="py-3 text-center border-t border-purple-900/30 bg-[#0d0d18]/80">
           <span className="font-mono-game text-xs text-purple-900 tracking-widest">
-            GAMECAFÉ MANAGEMENT SYSTEM v3.0
+            BENGALURU SNOOKER CLUB MANAGEMENT SYSTEM v3.0
           </span>
         </footer>
 
